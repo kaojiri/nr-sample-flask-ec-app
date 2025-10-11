@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: flask-ec-postgres
+    environment:
+      POSTGRES_DB: ecdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    container_name: flask-ec-app
+    environment:
+      - FLASK_ENV=development
+      - SECRET_KEY=dev-secret-key-for-local
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ecdb
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY:-your-license-key-here}
+      - NEW_RELIC_ENVIRONMENT=development
+      - NEW_RELIC_APP_NAME=Flask-EC-App-Local
+    ports:
+      - "5001:5000"
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

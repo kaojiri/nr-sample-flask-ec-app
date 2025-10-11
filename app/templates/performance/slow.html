@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}遅いページ - EC Shop{% endblock %}
+
+{% block content %}
+<div class="alert alert-danger">
+    <strong>⚠️ このページは意図的に遅く設定されています（3-5秒のレスポンス時間）</strong>
+</div>
+
+<h1>遅いページのデモ</h1>
+<p class="text-muted">計算結果: {{ computation_result }}</p>
+
+<h2>商品一覧</h2>
+<div class="row">
+    {% for product in products %}
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">{{ product.name }}</h5>
+                <p class="card-text">¥{{ product.price }}</p>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="mt-4">
+    <a href="{{ url_for('performance.index') }}" class="btn btn-outline-primary">← デモページに戻る</a>
+</div>
+{% endblock %}

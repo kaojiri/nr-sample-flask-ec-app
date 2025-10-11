@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Slow Query Demo - EC Shop{% endblock %}
+
+{% block content %}
+<div class="alert alert-warning" role="alert">
+    <h4 class="alert-heading">🗄️ Slow Queryデモページ</h4>
+    <p>このページには<strong>意図的に遅いデータベースクエリを実行するボタン</strong>があります。</p>
+    <hr>
+    <p class="mb-0">New Relic APMのDatabasesセクションでSlow Queryを検知するためのデモです。本番環境では使用しないでください！</p>
+</div>
+
+<h1>Slow Query デモ</h1>
+<p class="lead">各ボタンをクリックすると、異なる種類の遅いデータベースクエリが実行され、New Relicに記録されます。</p>
+
+<div class="alert alert-info">
+    <strong>💡 クエリが遅くない場合:</strong>
+    データベースのレコード数が少ないと、クエリが高速に実行されてしまいます。
+    <a href="{{ url_for('performance.generate_test_data_page') }}" class="alert-link">
+        <strong>テストデータを生成</strong>
+    </a>
+    して、実際にSlow Queryを体験してください。
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6 mb-4">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5>🐌 pg_sleep() による遅延</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>クエリタイプ:</strong> PostgreSQL pg_sleep()</p>
+                <p><strong>説明:</strong> 3-5秒間スリープする意図的な遅延クエリ</p>
+                <p><strong>New Relicで検知:</strong></p>
+                <ul>
+                    <li>クエリ実行時間: 3-5秒</li>
+                    <li>SQL文に pg_sleep() が含まれる</li>
+                    <li>Transaction Tracesでデータベース時間が大きい</li>
+                </ul>
+                <a href="{{ url_for('performance.slow_query_sleep') }}" class="btn btn-danger">実行する</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h5>📊 フルテーブルスキャン</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>クエリタイプ:</strong> LIKE with leading wildcard</p>
+                <p><strong>説明:</strong> LIKE '%keyword%' でインデックスが効かないクエリ</p>
+                <p><strong>New Relicで検知:</strong></p>
+                <ul>
+                    <li>Full table scan</li>
+                    <li>インデックスが使用されない</li>
+                    <li>Explain Planで Seq Scan が表示</li>
+                </ul>
+                <a href="{{ url_for('performance.slow_query_full_scan') }}" class="btn btn-warning">実行する</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white">
+                <h5>🔗 複雑なJOIN・集計</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>クエリタイプ:</strong> Complex JOIN with aggregations</p>
+                <p><strong>説明:</strong> 複数のJOINと集計関数（COUNT, SUM, AVG, MAX, MIN）</p>
+                <p><strong>New Relicで検知:</strong></p>
+                <ul>
+                    <li>複数のJOIN操作</li>
+                    <li>GROUP BY / HAVING句</li>
+                    <li>複数の集計関数</li>
+                </ul>
+                <a href="{{ url_for('performance.slow_query_complex_join') }}" class="btn btn-info">実行する</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5>⚠️ Cartesian Product</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>クエリタイプ:</strong> Missing JOIN condition</p>
+                <p><strong>説明:</strong> JOIN条件がない直積結合（製品数×注文数の行）</p>
+                <p><strong>New Relicで検知:</strong></p>
+                <ul>
+                    <li>非常に多い行数</li>
+                    <li>Cartesian product warning</li>
+                    <li>極端に長い実行時間</li>
+                </ul>
+                <a href="{{ url_for('performance.slow_query_cartesian') }}" class="btn btn-danger">実行する（注意）</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card border-secondary">
+            <div class="card-header bg-secondary text-white">
+                <h5>📦 LIMIT句なし</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>クエリタイプ:</strong> Query without LIMIT</p>
+                <p><strong>説明:</strong> 全レコードを取得（LIMIT句なし）+ 複数カラムでソート</p>
+                <p><strong>New Relicで検知:</strong></p>
+                <ul>
+                    <li>大量のレコード取得</li>
+                    <li>メモリ使用量の増加</li>
+                    <li>データ転送時間が長い</li>
+                </ul>
+                <a href="{{ url_for('performance.slow_query_no_limit') }}" class="btn btn-secondary">実行する</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5>🔤 Sequential Scan + 文字列関数</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>クエリタイプ:</strong> String operations (LENGTH, UPPER, LOWER)</p>
+                <p><strong>説明:</strong> 文字列関数を使ったSequential Scan</p>
+                <p><strong>New Relicで検知:</strong></p>
+                <ul>
+                    <li>文字列関数によるインデックス無効化</li>
+                    <li>Full table scan</li>
+                    <li>CPU使用率の増加</li>
+                </ul>
+                <a href="{{ url_for('performance.slow_query_sequential_scan') }}" class="btn btn-primary">実行する</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-success mt-4">
+    <h5>✅ New Relicでの確認方法</h5>
+    <ol>
+        <li><strong>APM → Databases</strong>: 全体的なデータベースパフォーマンスを確認</li>
+        <li><strong>Slow SQL Queries</strong>: 実行時間の長いクエリ一覧</li>
+        <li><strong>Transaction Traces</strong>: トランザクション内でのデータベース時間の割合</li>
+        <li><strong>Explain Plans</strong>: PostgreSQLのクエリ実行計画（0.5秒以上のクエリ）</li>
+    </ol>
+    <p class="mb-0"><strong>設定:</strong> newrelic.iniで以下が有効化されています:
+        <code>transaction_tracer.explain_enabled = true</code>,
+        <code>transaction_tracer.explain_threshold = 0.5</code>
+    </p>
+</div>
+
+<div class="alert alert-info mt-3">
+    <h5>📝 各クエリパターンの説明</h5>
+    <dl>
+        <dt>pg_sleep()</dt>
+        <dd>PostgreSQLの関数で指定秒数スリープ。外部APIやネットワーク遅延をシミュレート。</dd>
+
+        <dt>Full Table Scan</dt>
+        <dd>インデックスを使わずテーブル全体をスキャン。<code>LIKE '%keyword%'</code>は前方一致でないためインデックスが効かない。</dd>
+
+        <dt>Complex JOIN</dt>
+        <dd>複数テーブルの結合と集計。適切なインデックスがないと遅くなる。</dd>
+
+        <dt>Cartesian Product</dt>
+        <dd>JOIN条件がないため全ての組み合わせを生成。N×M行になり非常に危険。</dd>
+
+        <dt>No LIMIT</dt>
+        <dd>件数制限なしで全レコード取得。メモリとネットワーク帯域を消費。</dd>
+    </dl>
+</div>
+
+<div class="mt-4">
+    <a href="{{ url_for('performance.index') }}" class="btn btn-outline-primary me-2">← パフォーマンスデモに戻る</a>
+    <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">← Topページに戻る</a>
+</div>
+{% endblock %}

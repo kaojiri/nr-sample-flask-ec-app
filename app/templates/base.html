@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}EC Shop{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- New Relic Browser Monitoring - Placeholder -->
+    <!--
+    To enable Browser Monitoring and Browser Logs:
+    1. Go to New Relic UI → Browser → Add a browser app
+    2. Get the JavaScript snippet
+    3. Replace this comment with the snippet below
+
+    The snippet should look like:
+    <script type="text/javascript">
+        window.NREUM||(NREUM={});NREUM.init={...};
+        window.NREUM||(NREUM={}),__nr_require=function(...){...}
+    </script>
+    -->
+
+    <!-- Browser Error Logging -->
+    <script>
+        // Set user information for New Relic Browser (if authenticated)
+        {% if current_user.is_authenticated %}
+        if (window.newrelic && window.newrelic.setCustomAttribute) {
+            // Standard New Relic user tracking attributes
+            window.newrelic.setCustomAttribute('enduser.id', '{{ current_user.id }}');
+            window.newrelic.setCustomAttribute('userId', '{{ current_user.id }}');
+            window.newrelic.setCustomAttribute('user', '{{ current_user.username }}');
+        }
+        {% endif %}
+
+        // Capture JavaScript errors and send to New Relic Browser
+        window.addEventListener('error', function(event) {
+            console.error('JavaScript Error:', event.error);
+
+            // If New Relic Browser is loaded, report the error
+            if (window.newrelic) {
+                window.newrelic.noticeError(event.error, {
+                    message: event.message,
+                    filename: event.filename,
+                    lineno: event.lineno,
+                    colno: event.colno
+                });
+            }
+        });
+
+        // Capture unhandled promise rejections
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('Unhandled Promise Rejection:', event.reason);
+
+            if (window.newrelic) {
+                window.newrelic.noticeError(event.reason, {
+                    type: 'UnhandledPromiseRejection'
+                });
+            }
+        });
+
+        // Custom logging function that sends to both console and New Relic
+        window.logToNewRelic = function(level, message, attributes) {
+            console[level](message, attributes);
+
+            if (window.newrelic && window.newrelic.log) {
+                window.newrelic.log(message, {
+                    level: level,
+                    ...attributes
+                });
+            }
+        };
+
+        // Helper function to trigger custom errors with context
+        window.triggerNewRelicError = function(errorMessage, customAttributes) {
+            var error = new Error(errorMessage);
+            if (window.newrelic) {
+                window.newrelic.noticeError(error, customAttributes);
+            }
+            throw error;
+        };
+    </script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('main.index') }}">EC Shop</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('products.list_products') }}">商品一覧</a>
+                    </li>
+                    {% if current_user.is_authenticated %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('cart.view_cart') }}">カート</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('auth.logout') }}">ログアウト</a>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('auth.login') }}">ログイン</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('auth.register') }}">会員登録</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-info alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Page-specific logging -->
+    <script>
+        // Log page view
+        if (window.logToNewRelic) {
+            window.logToNewRelic('info', 'Page loaded', {
+                page: '{{ request.endpoint }}',
+                url: '{{ request.url }}',
+                referrer: document.referrer
+            });
+        }
+
+        // Log performance metrics
+        window.addEventListener('load', function() {
+            if (window.performance && window.logToNewRelic) {
+                var perfData = window.performance.timing;
+                var pageLoadTime = perfData.loadEventEnd - perfData.navigationStart;
+                var domReadyTime = perfData.domContentLoadedEventEnd - perfData.navigationStart;
+
+                window.logToNewRelic('info', 'Performance metrics', {
+                    event_type: 'performance',
+                    page_load_time: pageLoadTime,
+                    dom_ready_time: domReadyTime,
+                    ttfb: perfData.responseStart - perfData.requestStart
+                });
+            }
+        });
+    </script>
+</body>
+</html>

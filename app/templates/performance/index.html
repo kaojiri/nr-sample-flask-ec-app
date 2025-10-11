@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}Performance Issues Demo - EC Shop{% endblock %}
+
+{% block content %}
+<div class="alert alert-warning" role="alert">
+    <h4 class="alert-heading">⚠️ デモ/テスト専用ページ</h4>
+    <p>このページは New Relic のモニタリング機能をデモするために、<strong>意図的にパフォーマンスの問題を含んでいます</strong>。</p>
+    <hr>
+    <p class="mb-0">本番環境では使用しないでください！</p>
+</div>
+
+<h1>パフォーマンス問題デモ</h1>
+<p class="lead">以下のエンドポイントは、New Relic で検知できるパフォーマンス問題を意図的に含んでいます。</p>
+
+<div class="row mt-4">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h5>🐌 遅い処理</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>問題:</strong> レスポンスに 3-5 秒かかる</p>
+                <p><strong>New Relic で検知:</strong></p>
+                <ul>
+                    <li>Transaction time が高い</li>
+                    <li>Apdex score が低い</li>
+                    <li>Slow transaction traces</li>
+                </ul>
+                <a href="{{ url_for('performance.slow_endpoint') }}" class="btn btn-danger">遅いページを開く</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h5>🔄 N+1 クエリ問題</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>問題:</strong> 20個の商品に対して40回以上のクエリ</p>
+                <p><strong>New Relic で検知:</strong></p>
+                <ul>
+                    <li>Database query count が異常に多い</li>
+                    <li>Multiple similar queries</li>
+                    <li>Database performance issues</li>
+                </ul>
+                <a href="{{ url_for('performance.n_plus_one_problem') }}" class="btn btn-warning">N+1問題を見る</a>
+                <a href="{{ url_for('performance.n_plus_one_fixed') }}" class="btn btn-success btn-sm">修正版</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5>📊 Core Web Vitals 問題</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>問題:</strong> LCP, INP, CLS が悪い</p>
+                <p><strong>New Relic Browser で検知:</strong></p>
+                <ul>
+                    <li>LCP (Largest Contentful Paint) > 4秒</li>
+                    <li>INP (Interaction to Next Paint) > 500ms</li>
+                    <li>CLS (Cumulative Layout Shift) > 0.25</li>
+                </ul>
+                <a href="{{ url_for('performance.bad_core_web_vitals') }}" class="btn btn-info">悪いページを開く</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5>💾 メモリ大量使用</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>問題:</strong> ~100MB のメモリを使用</p>
+                <p><strong>New Relic で検知:</strong></p>
+                <ul>
+                    <li>High memory usage</li>
+                    <li>Potential memory leaks</li>
+                </ul>
+                <a href="{{ url_for('performance.memory_intensive') }}" class="btn btn-primary">メモリ集約処理</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5>💥 エラー発生</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>問題:</strong> 必ずエラーが発生する</p>
+                <p><strong>New Relic で検知:</strong></p>
+                <ul>
+                    <li>Error rate 100%</li>
+                    <li>Exception details</li>
+                    <li>Stack traces</li>
+                </ul>
+                <a href="{{ url_for('performance.trigger_error') }}" class="btn btn-danger">エラーを発生させる</a>
+                <a href="{{ url_for('performance.random_error') }}" class="btn btn-warning btn-sm">30% エラー</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-secondary text-white">
+                <h5>⚡ 高CPU使用</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>問題:</strong> CPU 集約的な計算</p>
+                <p><strong>New Relic で検知:</strong></p>
+                <ul>
+                    <li>High CPU usage</li>
+                    <li>Long-running transactions</li>
+                </ul>
+                <a href="{{ url_for('performance.high_cpu') }}" class="btn btn-secondary">CPU集約処理</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5>💻 JavaScriptエラー</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>問題:</strong> フロントエンドでJavaScriptエラーが発生</p>
+                <p><strong>New Relic Browser で検知:</strong></p>
+                <ul>
+                    <li>JavaScript errors とスタックトレース</li>
+                    <li>Unhandled promise rejections</li>
+                    <li>Network errors</li>
+                    <li>影響を受けたユーザー数</li>
+                </ul>
+                <a href="{{ url_for('performance.js_errors') }}" class="btn btn-danger">JSエラーデモ</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h5>🗄️ Slow Query (遅いクエリ)</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>問題:</strong> データベースクエリが遅い</p>
+                <p><strong>New Relic で検知:</strong></p>
+                <ul>
+                    <li>Slow SQL queries (3-5秒)</li>
+                    <li>Full table scans</li>
+                    <li>Complex JOINs / Cartesian Product</li>
+                    <li>Explain Plans</li>
+                </ul>
+                <a href="{{ url_for('performance.slow_query_index') }}" class="btn btn-warning">Slow Queryデモ</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white">
+                <h5>📊 テストデータ生成</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>機能:</strong> Slow Query用の大量データ生成</p>
+                <p><strong>生成されるデータ:</strong></p>
+                <ul>
+                    <li>商品: 10,000件（デフォルト）</li>
+                    <li>注文: 5,000件</li>
+                    <li>注文明細: 20,000件</li>
+                    <li>予想実行時間: 1-2分</li>
+                </ul>
+                <a href="{{ url_for('performance.generate_test_data_page') }}" class="btn btn-info">データ生成</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-info mt-4">
+    <h5>📝 New Relic での確認方法</h5>
+    <ol>
+        <li><strong>APM Overview</strong>: 全体的なパフォーマンスを確認</li>
+        <li><strong>Transactions</strong>: 各エンドポイントのレスポンスタイムを比較</li>
+        <li><strong>Databases</strong>: クエリ数とスロークエリを確認</li>
+        <li><strong>Errors</strong>: エラー率とスタックトレースを確認</li>
+        <li><strong>Browser</strong>: Core Web Vitals を確認（Browser monitoring 有効化が必要）</li>
+    </ol>
+</div>
+
+<div class="mt-4">
+    <a href="{{ url_for('main.index') }}" class="btn btn-outline-primary">← ホームに戻る</a>
+</div>
+{% endblock %}

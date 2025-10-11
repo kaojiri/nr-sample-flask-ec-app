@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Core Web Vitals が悪いページ - EC Shop{% endblock %}
+
+{% block content %}
+<div class="alert alert-info">
+    <strong>📊 このページは Core Web Vitals が悪くなるように設計されています</strong>
+</div>
+
+<h1>商品一覧（Core Web Vitals デモ）</h1>
+
+<!-- LCP を悪化させる: 巨大な画像 -->
+<div class="mb-4">
+    <img src="https://picsum.photos/1920/1080?random=1"
+         alt="Large Hero Image"
+         class="img-fluid"
+         style="width: 100%; height: auto;">
+</div>
+
+<!-- CLS を悪化させる: サイズ未指定の画像 -->
+<div id="dynamic-content"></div>
+
+<div class="row">
+    {% for product in products %}
+    <div class="col-md-3 mb-4">
+        <div class="card">
+            <!-- CLS を悪化: サイズ未指定 -->
+            <img src="https://picsum.photos/300/300?random={{ loop.index }}"
+                 class="card-img-top"
+                 alt="{{ product.name }}">
+            <div class="card-body">
+                <h5 class="card-title">{{ product.name }}</h5>
+                <p class="card-text">¥{{ product.price }}</p>
+                <!-- INP を悪化させるボタン -->
+                <button class="btn btn-primary btn-sm" onclick="heavyComputation({{ loop.index }})">
+                    詳細を見る
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- レンダリングブロッキングCSS -->
+<style>
+    /* 大量のCSSルールでLCPを遅延 */
+    {% for i in range(1000) %}
+    .dummy-class-{{ i }} {
+        background-color: #{{ '%06x' % (i * 100) }};
+        margin: {{ i }}px;
+        padding: {{ i }}px;
+    }
+    {% endfor %}
+</style>
+
+<script>
+// INP を悪化させる: 重い処理
+function heavyComputation(productId) {
+    // 500ms以上かかる処理
+    let result = 0;
+    for (let i = 0; i < 10000000; i++) {
+        result += Math.sqrt(i);
+    }
+
+    // さらにDOM操作で遅延
+    const start = Date.now();
+    while (Date.now() - start < 200) {
+        // Busy wait
+    }
+
+    alert('商品 ' + productId + ' の詳細（計算結果: ' + result + '）');
+}
+
+// CLS を悪化させる: 遅延コンテンツの挿入
+window.addEventListener('load', function() {
+    setTimeout(function() {
+        const dynamicContent = document.getElementById('dynamic-content');
+        const banner = document.createElement('div');
+        banner.className = 'alert alert-warning';
+        banner.style.height = '200px';
+        banner.innerHTML = '<h3>遅延表示された広告バナー</h3><p>これはCLSを悪化させます</p>';
+        dynamicContent.appendChild(banner);
+    }, 2000);
+
+    // さらに別の遅延コンテンツ
+    setTimeout(function() {
+        const banner2 = document.createElement('div');
+        banner2.className = 'alert alert-info';
+        banner2.style.height = '150px';
+        banner2.innerHTML = '<h4>さらに遅延したコンテンツ</h4>';
+        document.querySelector('.row').insertAdjacentElement('beforebegin', banner2);
+    }, 3000);
+});
+
+// LCP を悪化させる: 大量の画像を遅延ロード
+setTimeout(function() {
+    const cards = document.querySelectorAll('.card-img-top');
+    cards.forEach(function(img, index) {
+        // 既に読み込まれた画像を再読み込み
+        setTimeout(function() {
+            img.src = img.src + '&reload=' + Date.now();
+        }, index * 100);
+    });
+}, 1000);
+</script>
+
+<div class="mt-4">
+    <a href="{{ url_for('performance.index') }}" class="btn btn-outline-primary">← デモページに戻る</a>
+</div>
+
+<div class="alert alert-info mt-4">
+    <h5>🔍 New Relic Browser で確認すべき点:</h5>
+    <ul>
+        <li><strong>LCP (Largest Contentful Paint)</strong>: 4秒以上</li>
+        <li><strong>INP (Interaction to Next Paint)</strong>: 500ms以上</li>
+        <li><strong>CLS (Cumulative Layout Shift)</strong>: 0.25以上</li>
+        <li><strong>Session Traces</strong>: ユーザー体験の詳細</li>
+    </ul>
+    <p class="mb-0">
+        <strong>注:</strong> Core Web Vitals を測定するには、New Relic Browser monitoring を有効化する必要があります。
+    </p>
+</div>
+{% endblock %}

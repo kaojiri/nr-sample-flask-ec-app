@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}テストデータ生成結果 - EC Shop{% endblock %}
+
+{% block content %}
+{% if success %}
+<div class="alert alert-success" role="alert">
+    <h4 class="alert-heading">✅ テストデータ生成が完了しました！</h4>
+    <p>指定した量のテストデータが正常に生成されました。</p>
+</div>
+
+<h1>テストデータ生成結果</h1>
+
+<div class="card mt-4">
+    <div class="card-header bg-success text-white">
+        <h5>生成されたデータ</h5>
+    </div>
+    <div class="card-body">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>テーブル</th>
+                    <th>生成件数</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>商品 (Products)</strong></td>
+                    <td class="text-success"><strong>{{ products_created }} 件</strong></td>
+                </tr>
+                <tr>
+                    <td><strong>注文 (Orders)</strong></td>
+                    <td class="text-success"><strong>{{ orders_created }} 件</strong></td>
+                </tr>
+                <tr>
+                    <td><strong>注文明細 (Order Items)</strong></td>
+                    <td class="text-success"><strong>{{ order_items_created }} 件</strong></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <dl class="row mt-3">
+            <dt class="col-sm-3">実行時間:</dt>
+            <dd class="col-sm-9"><strong>{{ "%.2f"|format(duration) }} 秒</strong></dd>
+
+            <dt class="col-sm-3">合計レコード数:</dt>
+            <dd class="col-sm-9"><strong>{{ products_created + orders_created + order_items_created }} 件</strong></dd>
+        </dl>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header bg-primary text-white">
+        <h5>次のステップ</h5>
+    </div>
+    <div class="card-body">
+        <p>データ生成が完了しました。Slow Queryデモを実行して、実際にクエリが遅くなることを確認してください。</p>
+
+        <h6>推奨される確認手順:</h6>
+        <ol>
+            <li><strong>Slow Queryデモページ</strong>に移動</li>
+            <li>各種クエリパターンを実行:
+                <ul>
+                    <li>Full Table Scan - <code>LIKE '%keyword%'</code></li>
+                    <li>Complex JOIN - 複数のJOINと集計</li>
+                    <li>Cartesian Product - JOIN条件なし（注意）</li>
+                    <li>No LIMIT - 全レコード取得</li>
+                </ul>
+            </li>
+            <li><strong>New Relic APM → Databases</strong>でクエリを確認</li>
+            <li><strong>Slow SQL Queries</strong>で実行時間とExplain Planを確認</li>
+        </ol>
+
+        <div class="d-grid gap-2 mt-3">
+            <a href="{{ url_for('performance.slow_query_index') }}" class="btn btn-primary btn-lg">
+                Slow Queryデモを試す →
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-info mt-4">
+    <h5>📊 期待される結果</h5>
+    <p>データ生成後、以下のような実行時間が期待されます:</p>
+    <table class="table table-sm">
+        <thead>
+            <tr>
+                <th>クエリタイプ</th>
+                <th>予想実行時間</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>pg_sleep(3-5秒)</td>
+                <td>3-5秒（確実）</td>
+            </tr>
+            <tr>
+                <td>Full Table Scan</td>
+                <td>0.5-2秒</td>
+            </tr>
+            <tr>
+                <td>Complex JOIN</td>
+                <td>1-3秒</td>
+            </tr>
+            <tr>
+                <td>Cartesian Product</td>
+                <td>3-10秒（危険）</td>
+            </tr>
+            <tr>
+                <td>No LIMIT</td>
+                <td>1-5秒</td>
+            </tr>
+        </tbody>
+    </table>
+    <p class="mb-0">
+        <strong>注:</strong> 実行時間は、データベースのスペックやインデックスの有無によって変わります。
+    </p>
+</div>
+
+{% else %}
+<div class="alert alert-danger" role="alert">
+    <h4 class="alert-heading">❌ テストデータ生成に失敗しました</h4>
+    <p>エラーが発生してデータ生成を完了できませんでした。</p>
+</div>
+
+<h1>テストデータ生成エラー</h1>
+
+<div class="card mt-4 border-danger">
+    <div class="card-header bg-danger text-white">
+        <h5>エラー詳細</h5>
+    </div>
+    <div class="card-body">
+        <pre class="bg-light p-3 rounded">{{ error }}</pre>
+
+        <h6 class="mt-3">部分的に生成されたデータ:</h6>
+        <ul>
+            <li>商品: {{ products_created }} 件</li>
+            <li>注文: {{ orders_created }} 件</li>
+            <li>注文明細: {{ order_items_created }} 件</li>
+        </ul>
+
+        <div class="alert alert-warning mt-3">
+            <strong>💡 トラブルシューティング:</strong>
+            <ul class="mb-0">
+                <li>データベース接続を確認してください</li>
+                <li>ディスク容量が十分にあるか確認してください</li>
+                <li>生成する件数を減らして再試行してください</li>
+                <li>アプリケーションログを確認してください</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="mt-4">
+    <a href="{{ url_for('performance.generate_test_data_page') }}" class="btn btn-outline-primary me-2">← データ生成ページに戻る</a>
+    <a href="{{ url_for('performance.index') }}" class="btn btn-outline-secondary">パフォーマンスデモに戻る</a>
+</div>
+{% endblock %}

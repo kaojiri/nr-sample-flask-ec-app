@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Slow Query Result - EC Shop{% endblock %}
+
+{% block content %}
+<div class="alert alert-success" role="alert">
+    <h4 class="alert-heading">✅ Slow Query が実行されました</h4>
+    <p>クエリが正常に実行され、New Relicに記録されました。</p>
+</div>
+
+<h1>Slow Query 実行結果</h1>
+
+<div class="card mt-4">
+    <div class="card-header bg-primary text-white">
+        <h5>実行情報</h5>
+    </div>
+    <div class="card-body">
+        <dl class="row">
+            <dt class="col-sm-3">クエリタイプ:</dt>
+            <dd class="col-sm-9"><code>{{ query_type }}</code></dd>
+
+            <dt class="col-sm-3">説明:</dt>
+            <dd class="col-sm-9">{{ description }}</dd>
+
+            <dt class="col-sm-3">実行時間:</dt>
+            <dd class="col-sm-9"><strong class="text-danger">{{ "%.3f"|format(duration) }} 秒</strong></dd>
+
+            <dt class="col-sm-3">取得レコード数:</dt>
+            <dd class="col-sm-9">{{ result_count }} 件</dd>
+        </dl>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header bg-info text-white">
+        <h5>New Relicでの確認方法</h5>
+    </div>
+    <div class="card-body">
+        <ol>
+            <li>New Relic にログイン</li>
+            <li><strong>APM & Services</strong> → 対象アプリケーションを選択</li>
+            <li>左メニューから <strong>Databases</strong> をクリック</li>
+            <li><strong>Slow SQL Queries</strong> タブを確認</li>
+            <li>実行時間で並び替えて、このクエリを探す</li>
+        </ol>
+
+        <h6 class="mt-3">確認できる情報:</h6>
+        <ul>
+            <li><strong>SQL Statement</strong>: 実行されたSQL文（難読化されている場合あり）</li>
+            <li><strong>Execution Time</strong>: クエリの実行時間</li>
+            <li><strong>Call Count</strong>: 実行回数</li>
+            <li><strong>Explain Plan</strong>: クエリの実行計画（0.5秒以上のクエリ）</li>
+            <li><strong>Transaction Name</strong>: このクエリを実行したトランザクション</li>
+        </ul>
+
+        <div class="alert alert-warning mt-3">
+            <strong>💡 ヒント:</strong> データがNew Relicに表示されるまで数秒〜数分かかる場合があります。
+            ページをリフレッシュして最新情報を確認してください。
+        </div>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header bg-secondary text-white">
+        <h5>このクエリパターンについて</h5>
+    </div>
+    <div class="card-body">
+        {% if query_type == 'pg_sleep' %}
+        <h6>pg_sleep() による遅延</h6>
+        <p><strong>問題:</strong> 外部APIやネットワーク遅延をシミュレート</p>
+        <p><strong>解決策:</strong></p>
+        <ul>
+            <li>外部API呼び出しを非同期化する</li>
+            <li>タイムアウトを設定する</li>
+            <li>キャッシュを活用する</li>
+        </ul>
+
+        {% elif query_type == 'full_scan' %}
+        <h6>フルテーブルスキャン</h6>
+        <p><strong>問題:</strong> インデックスが効かず、テーブル全体をスキャン</p>
+        <p><strong>解決策:</strong></p>
+        <ul>
+            <li>前方一致検索を使う: <code>LIKE 'keyword%'</code></li>
+            <li>全文検索インデックスを作成する（PostgreSQL: GIN, GiST）</li>
+            <li>検索専用のカラムを追加してインデックスを張る</li>
+        </ul>
+
+        {% elif query_type == 'complex_join' %}
+        <h6>複雑なJOIN・集計</h6>
+        <p><strong>問題:</strong> 複数のJOINと集計処理で処理が重い</p>
+        <p><strong>解決策:</strong></p>
+        <ul>
+            <li>適切なインデックスを作成する（JOINキー、GROUP BYキー）</li>
+            <li>集計結果をキャッシュまたはマテリアライズドビューに保存</li>
+            <li>必要な場合のみ集計を実行する</li>
+        </ul>
+
+        {% elif query_type == 'cartesian' %}
+        <h6>Cartesian Product（直積結合）</h6>
+        <p><strong>問題:</strong> JOIN条件がなく、全ての組み合わせを生成（N×M行）</p>
+        <p><strong>解決策:</strong></p>
+        <ul>
+            <li><strong>必ずJOIN条件を指定する:</strong> <code>JOIN table ON condition</code></li>
+            <li>意図的なCross Joinの場合は明示的に <code>CROSS JOIN</code> を使用</li>
+            <li>結果セットのサイズを事前に確認する</li>
+        </ul>
+
+        {% elif query_type == 'no_limit' %}
+        <h6>LIMIT句なし</h6>
+        <p><strong>問題:</strong> 全レコード取得でメモリとネットワークを消費</p>
+        <p><strong>解決策:</strong></p>
+        <ul>
+            <li><strong>必ずLIMIT句を使う:</strong> <code>LIMIT 100</code></li>
+            <li>ページネーションを実装する</li>
+            <li>必要な分だけ取得する（無限スクロールなど）</li>
+        </ul>
+
+        {% endif %}
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="{{ url_for('performance.slow_query_index') }}" class="btn btn-primary">← Slow Queryデモに戻る</a>
+    <a href="{{ url_for('performance.index') }}" class="btn btn-outline-secondary">パフォーマンスデモに戻る</a>
+</div>
+{% endblock %}

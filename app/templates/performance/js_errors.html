@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+
+{% block title %}JavaScript Errors Demo - EC Shop{% endblock %}
+
+{% block content %}
+<div class="alert alert-danger" role="alert">
+    <h4 class="alert-heading">🚨 JavaScriptエラーデモページ</h4>
+    <p>このページには<strong>意図的にJavaScriptエラーを発生させるボタン</strong>があります。</p>
+    <hr>
+    <p class="mb-0">New Relic Browserでエラーを検知するためのデモです。本番環境では使用しないでください！</p>
+</div>
+
+<h1>JavaScript エラーデモ</h1>
+<p class="lead">各ボタンをクリックすると、異なる種類のJavaScriptエラーが発生し、New Relic Browserに記録されます。</p>
+
+<div class="row mt-4">
+    <div class="col-md-6 mb-4">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5>💥 Null Reference Error</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>エラータイプ:</strong> TypeError</p>
+                <p><strong>説明:</strong> nullやundefinedのプロパティにアクセスしようとする</p>
+                <p><strong>New Relicで検知:</strong></p>
+                <ul>
+                    <li>JS Errors ページにエラーが表示</li>
+                    <li>スタックトレースが記録</li>
+                    <li>エラー発生時のページURLとユーザー情報</li>
+                </ul>
+                <button onclick="triggerNullError()" class="btn btn-danger">エラーを発生させる</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h5>⚠️ Undefined Function Error</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>エラータイプ:</strong> ReferenceError</p>
+                <p><strong>説明:</strong> 存在しない関数を呼び出そうとする</p>
+                <p><strong>New Relicで検知:</strong></p>
+                <ul>
+                    <li>関数名と呼び出し元を記録</li>
+                    <li>エラー発生回数をカウント</li>
+                    <li>影響を受けたユーザー数を表示</li>
+                </ul>
+                <button onclick="triggerUndefinedFunctionError()" class="btn btn-warning">エラーを発生させる</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white">
+                <h5>🔄 Promise Rejection Error</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>エラータイプ:</strong> UnhandledPromiseRejection</p>
+                <p><strong>説明:</strong> Promiseがrejectされたがcatchされない</p>
+                <p><strong>New Relicで検知:</strong></p>
+                <ul>
+                    <li>Promise拒否の理由を記録</li>
+                    <li>非同期エラーとして分類</li>
+                    <li>カスタム属性付きで記録</li>
+                </ul>
+                <button onclick="triggerPromiseRejection()" class="btn btn-info">エラーを発生させる</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5>⏱️ Async Function Error</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>エラータイプ:</strong> Error in async/await</p>
+                <p><strong>説明:</strong> async関数内でエラーが発生</p>
+                <p><strong>New Relicで検知:</strong></p>
+                <ul>
+                    <li>非同期スタックトレース</li>
+                    <li>await時のコンテキスト</li>
+                    <li>タイミング情報を記録</li>
+                </ul>
+                <button onclick="triggerAsyncError()" class="btn btn-primary">エラーを発生させる</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card border-secondary">
+            <div class="card-header bg-secondary text-white">
+                <h5>🌐 Network Error</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>エラータイプ:</strong> Fetch API Error</p>
+                <p><strong>説明:</strong> APIリクエストが失敗する</p>
+                <p><strong>New Relicで検知:</strong></p>
+                <ul>
+                    <li>HTTPステータスコード</li>
+                    <li>リクエストURL</li>
+                    <li>レスポンスタイム</li>
+                </ul>
+                <button onclick="triggerNetworkError()" class="btn btn-secondary">エラーを発生させる</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card border-dark">
+            <div class="card-header bg-dark text-white">
+                <h5>🎯 Custom Error with Attributes</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>エラータイプ:</strong> Custom Error</p>
+                <p><strong>説明:</strong> カスタム属性付きのエラー</p>
+                <p><strong>New Relicで検知:</strong></p>
+                <ul>
+                    <li>カスタム属性を含む</li>
+                    <li>エラーコンテキスト情報</li>
+                    <li>ビジネスロジックの情報</li>
+                </ul>
+                <button onclick="triggerCustomError()" class="btn btn-dark">エラーを発生させる</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-success mt-4">
+    <h5>✅ New Relicでの確認方法</h5>
+    <ol>
+        <li><strong>Browser → JS Errors</strong>: 全てのJavaScriptエラーを一覧表示</li>
+        <li><strong>Errors Inbox</strong>: エラーをグルーピングして表示</li>
+        <li><strong>Session Traces</strong>: エラー発生前のユーザー操作を確認</li>
+        <li><strong>Error Analytics</strong>: エラーのトレンドと分析</li>
+    </ol>
+    <p class="mb-0"><strong>注意:</strong> New Relic Browserエージェントがインストールされている必要があります。</p>
+</div>
+
+<div class="mt-4">
+    <a href="{{ url_for('performance.index') }}" class="btn btn-outline-primary me-2">← パフォーマンスデモに戻る</a>
+    <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">← Topページに戻る</a>
+</div>
+
+<script>
+// 1. Null Reference Error
+function triggerNullError() {
+    console.log('Triggering null reference error...');
+    var obj = null;
+    // This will throw: TypeError: Cannot read property 'property' of null
+    console.log(obj.property);
+}
+
+// 2. Undefined Function Error
+function triggerUndefinedFunctionError() {
+    console.log('Triggering undefined function error...');
+    // This will throw: ReferenceError: thisDoesNotExist is not defined
+    thisDoesNotExist();
+}
+
+// 3. Promise Rejection Error
+function triggerPromiseRejection() {
+    console.log('Triggering promise rejection...');
+    // Promise that rejects without catch handler
+    Promise.reject(new Error('Unhandled promise rejection for New Relic testing'))
+        .then(function() {
+            console.log('This will not execute');
+        });
+    // Note: No .catch() handler, so it becomes unhandled
+}
+
+// 4. Async Function Error
+async function triggerAsyncError() {
+    console.log('Triggering async error...');
+    // Simulate async operation that fails
+    await new Promise(resolve => setTimeout(resolve, 100));
+    throw new Error('Error in async function for New Relic testing');
+}
+
+// 5. Network Error
+async function triggerNetworkError() {
+    console.log('Triggering network error...');
+    try {
+        const response = await fetch('{{ url_for("performance.api_fail") }}');
+        if (!response.ok) {
+            throw new Error('API request failed with status ' + response.status);
+        }
+    } catch (error) {
+        console.error('Network error caught:', error);
+        // Re-throw to ensure New Relic captures it
+        if (window.newrelic) {
+            window.newrelic.noticeError(error, {
+                errorType: 'NetworkError',
+                endpoint: '{{ url_for("performance.api_fail") }}',
+                statusCode: 500
+            });
+        }
+        throw error;
+    }
+}
+
+// 6. Custom Error with Attributes
+function triggerCustomError() {
+    console.log('Triggering custom error with attributes...');
+    var error = new Error('Custom error for New Relic demo');
+
+    // Add custom attributes
+    if (window.newrelic) {
+        window.newrelic.noticeError(error, {
+            errorType: 'CustomDemoError',
+            component: 'JavaScriptErrorsDemo',
+            severity: 'high',
+            userId: '{{ current_user.id if current_user.is_authenticated else "anonymous" }}',
+            timestamp: new Date().toISOString(),
+            userAction: 'button_click',
+            pageContext: 'js_errors_demo'
+        });
+    }
+
+    throw error;
+}
+
+// Log page load
+if (window.logToNewRelic) {
+    window.logToNewRelic('info', 'JavaScript Errors Demo page loaded', {
+        demoType: 'js_errors',
+        availableErrors: 6
+    });
+}
+</script>
+{% endblock %}

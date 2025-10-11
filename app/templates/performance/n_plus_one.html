@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}N+1 クエリ問題 - EC Shop{% endblock %}
+
+{% block content %}
+<div class="alert alert-warning">
+    <strong>⚠️ このページは N+1 クエリ問題を含んでいます</strong>
+    <p class="mb-0">20個の商品に対して 40回以上のデータベースクエリが実行されます。</p>
+</div>
+
+<h1>商品と売上統計</h1>
+<p class="text-muted">N+1 クエリ問題のデモ</p>
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>商品名</th>
+                <th>価格</th>
+                <th>注文数</th>
+                <th>総売上</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in product_data %}
+            <tr>
+                <td>{{ item.product.name }}</td>
+                <td>¥{{ item.product.price }}</td>
+                <td>{{ item.order_count }}</td>
+                <td>¥{{ item.revenue }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="alert alert-info mt-4">
+    <h5>New Relic で確認すべき点:</h5>
+    <ul>
+        <li><strong>Database</strong> タブ: クエリ数が異常に多い</li>
+        <li><strong>SQL queries</strong>: 同じようなクエリが複数回実行されている</li>
+        <li>修正版と比較して、クエリ数の違いを確認</li>
+    </ul>
+</div>
+
+<div class="mt-4">
+    <a href="{{ url_for('performance.index') }}" class="btn btn-outline-primary">← デモページに戻る</a>
+    <a href="{{ url_for('performance.n_plus_one_fixed') }}" class="btn btn-success">修正版を見る</a>
+</div>
+{% endblock %}

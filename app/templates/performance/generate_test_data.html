@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}テストデータ生成 - EC Shop{% endblock %}
+
+{% block content %}
+<div class="alert alert-warning" role="alert">
+    <h4 class="alert-heading">⚠️ テストデータ生成</h4>
+    <p>この機能は<strong>大量のテストデータを生成</strong>します。Slow Queryのデモを実際に遅くするために使用します。</p>
+    <hr>
+    <p class="mb-0"><strong>注意:</strong> データ生成には時間がかかる場合があります。本番環境では使用しないでください！</p>
+</div>
+
+<h1>📊 テストデータ生成</h1>
+
+<div class="card mt-4">
+    <div class="card-header bg-info text-white">
+        <h5>現在のデータベース状況</h5>
+    </div>
+    <div class="card-body">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>テーブル</th>
+                    <th>現在のレコード数</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>商品 (Products)</strong></td>
+                    <td>{{ product_count }} 件</td>
+                </tr>
+                <tr>
+                    <td><strong>注文 (Orders)</strong></td>
+                    <td>{{ order_count }} 件</td>
+                </tr>
+                <tr>
+                    <td><strong>注文明細 (Order Items)</strong></td>
+                    <td>{{ order_item_count }} 件</td>
+                </tr>
+            </tbody>
+        </table>
+
+        {% if product_count < 1000 %}
+        <div class="alert alert-info">
+            💡 現在、データが少ないため、Slow Queryが実際には遅くなりません。<br>
+            大量のデータを生成することで、パフォーマンス問題を再現できます。
+        </div>
+        {% else %}
+        <div class="alert alert-success">
+            ✅ 十分なデータがあります。Slow Queryデモが正常に動作します。
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header bg-primary text-white">
+        <h5>テストデータ生成設定</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('performance.generate_test_data_execute') }}" onsubmit="return confirm('データ生成を開始します。時間がかかる場合があります。よろしいですか？');">
+            <div class="mb-3">
+                <label for="num_products" class="form-label"><strong>商品数 (Products)</strong></label>
+                <input type="number" class="form-control" id="num_products" name="num_products" value="100000" min="1000" max="1000000">
+                <small class="form-text text-muted">推奨: 100,000件（Slow Queryをテストするには大量のデータが必要）</small>
+            </div>
+
+            <div class="mb-3">
+                <label for="num_orders" class="form-label"><strong>注文数 (Orders)</strong></label>
+                <input type="number" class="form-control" id="num_orders" name="num_orders" value="50000" min="1000" max="200000">
+                <small class="form-text text-muted">推奨: 50,000件</small>
+            </div>
+
+            <div class="mb-3">
+                <label for="num_order_items" class="form-label"><strong>注文明細数 (Order Items)</strong></label>
+                <input type="number" class="form-control" id="num_order_items" name="num_order_items" value="200000" min="1000" max="500000">
+                <small class="form-text text-muted">推奨: 200,000件（注文ごとに1-10件）</small>
+            </div>
+
+            <div class="alert alert-warning">
+                <strong>⏱️ 予想実行時間:</strong>
+                <ul class="mb-0">
+                    <li>商品 100,000件: 約1-3分</li>
+                    <li>注文 50,000件 + 注文明細 200,000件: 約5-10分</li>
+                    <li><strong>合計: 約6-13分</strong></li>
+                </ul>
+                <p class="mb-0 mt-2"><strong>💡 重要:</strong> 少ないデータ（10,000-30,000件）ではクエリが高速すぎてSlow Queryになりません。Slow Queryのテストには<strong>100,000件以上</strong>を推奨します。</p>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="bi bi-play-fill"></i> データを生成する
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header bg-secondary text-white">
+        <h5>生成されるデータの種類</h5>
+    </div>
+    <div class="card-body">
+        <h6>商品 (Products)</h6>
+        <ul>
+            <li>ランダムな商品名（日本語）</li>
+            <li>ランダムな説明文</li>
+            <li>価格: ¥100 - ¥50,000</li>
+            <li>在庫: 0 - 1,000個</li>
+            <li>カテゴリ: Electronics, Books, Clothing, Food, Toys, Sports, Home, Beauty</li>
+        </ul>
+
+        <h6>注文 (Orders)</h6>
+        <ul>
+            <li>テストユーザー（testuser@example.com）に紐づく</li>
+            <li>ステータス: pending, processing, shipped, delivered</li>
+            <li>合計金額: 注文明細から自動計算</li>
+        </ul>
+
+        <h6>注文明細 (Order Items)</h6>
+        <ul>
+            <li>各注文に1-10件の明細</li>
+            <li>ランダムな商品と数量（1-5個）</li>
+            <li>注文時の価格を記録</li>
+        </ul>
+    </div>
+</div>
+
+<div class="alert alert-info mt-4">
+    <h5>📝 この機能が必要な理由</h5>
+    <p>Slow Queryデモでは、以下のクエリパターンをテストします:</p>
+    <ul>
+        <li><strong>Full Table Scan</strong>: データが少ないと瞬時に終わる</li>
+        <li><strong>Complex JOIN</strong>: JOINするテーブルのレコードが少ないと高速</li>
+        <li><strong>Cartesian Product</strong>: N×M行生成なので、NとMが小さいと問題にならない</li>
+        <li><strong>No LIMIT</strong>: 全レコード取得なので、レコード数が重要</li>
+    </ul>
+    <p class="mb-0">
+        <strong>10,000件以上</strong>のデータがあれば、これらのクエリが実際に遅くなり、
+        New Relicで観測できるようになります。
+    </p>
+</div>
+
+<div class="mt-4">
+    <a href="{{ url_for('performance.slow_query_index') }}" class="btn btn-outline-primary me-2">← Slow Queryデモに戻る</a>
+    <a href="{{ url_for('performance.index') }}" class="btn btn-outline-secondary">パフォーマンスデモに戻る</a>
+</div>
+{% endblock %}

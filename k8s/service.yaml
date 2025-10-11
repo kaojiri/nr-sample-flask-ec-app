@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: flask-ec-app-service
+  namespace: flask-ec-app
+  labels:
+    app: flask-ec-app
+spec:
+  type: LoadBalancer
+  selector:
+    app: flask-ec-app
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 5000
+    name: http

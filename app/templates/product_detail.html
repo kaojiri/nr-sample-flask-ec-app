@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}{{ product.name }} - EC Shop{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6">
+        {% if product.image_url %}
+        <img src="{{ product.image_url }}" class="img-fluid" alt="{{ product.name }}">
+        {% else %}
+        <div class="bg-secondary text-white d-flex align-items-center justify-content-center" style="height: 400px;">
+            No Image
+        </div>
+        {% endif %}
+    </div>
+    <div class="col-md-6">
+        <h2>{{ product.name }}</h2>
+        <p class="text-muted">{{ product.category }}</p>
+        <h3 class="text-primary">¥{{ product.price }}</h3>
+        <p>{{ product.description }}</p>
+        <p><strong>在庫:</strong> {{ product.stock }}個</p>
+
+        {% if current_user.is_authenticated %}
+        <form method="POST" action="{{ url_for('cart.add_to_cart', product_id=product.id) }}">
+            <div class="mb-3">
+                <label for="quantity" class="form-label">数量</label>
+                <input type="number" class="form-control" id="quantity" name="quantity" value="1" min="1" max="{{ product.stock }}" style="width: 100px;">
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg" {% if product.stock == 0 %}disabled{% endif %}>
+                カートに追加
+            </button>
+        </form>
+        {% else %}
+        <p><a href="{{ url_for('auth.login') }}">ログイン</a>してカートに追加できます</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: flask-ec-app-db-migration
+  namespace: flask-ec-app
+spec:
+  template:
+    spec:
+      containers:
+      - name: db-migration
+        image: <YOUR_ECR_REPO_URL>/flask-ec-app:latest
+        command: ["flask", "db", "upgrade"]
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: flask-ec-app-secrets
+              key: DATABASE_URL
+      restartPolicy: OnFailure
+      imagePullSecrets:
+      - name: ecr-registry-secret
+  backoffLimit: 3

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}ホーム - EC Shop{% endblock %}
+
+{% block content %}
+<div class="jumbotron bg-light p-5 rounded-lg mb-4">
+    <h1 class="display-4">Welcome to EC Shop!</h1>
+    <p class="lead">高品質な商品をお求めやすい価格で</p>
+    <a class="btn btn-primary btn-lg" href="{{ url_for('products.list_products') }}">商品を見る</a>
+</div>
+
+<h2>おすすめ商品</h2>
+<div class="row">
+    {% for product in products %}
+    <div class="col-md-3 mb-4">
+        <div class="card">
+            {% if product.image_url %}
+            <img src="{{ product.image_url }}" class="card-img-top" alt="{{ product.name }}">
+            {% else %}
+            <div class="card-img-top bg-secondary text-white d-flex align-items-center justify-content-center" style="height: 200px;">
+                No Image
+            </div>
+            {% endif %}
+            <div class="card-body">
+                <h5 class="card-title">{{ product.name }}</h5>
+                <p class="card-text">¥{{ product.price }}</p>
+                <a href="{{ url_for('products.product_detail', product_id=product.id) }}" class="btn btn-primary btn-sm">詳細を見る</a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<hr class="my-5">
+
+<h2>開発者向けデモ</h2>
+<p class="text-muted">New Relic のモニタリング機能をテストするためのデモページです</p>
+<div class="row mt-4">
+    <div class="col-md-6 mb-4">
+        <div class="card border-warning h-100">
+            <div class="card-header bg-warning">
+                <h5 class="mb-0">⚡ パフォーマンス問題デモ</h5>
+            </div>
+            <div class="card-body">
+                <p>New Relic APMで検知できる様々なパフォーマンス問題を実際に体験できます。</p>
+                <ul>
+                    <li><strong>遅いエンドポイント</strong> - 3-5秒のレスポンス</li>
+                    <li><strong>N+1クエリ問題</strong> - 非効率なデータベースクエリ</li>
+                    <li><strong>メモリ/CPU集約処理</strong> - リソース使用量の問題</li>
+                    <li><strong>エラー発生</strong> - 例外とスタックトレース</li>
+                </ul>
+                <a href="{{ url_for('performance.index') }}" class="btn btn-warning">パフォーマンスデモを見る →</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card border-danger h-100">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">💻 JavaScriptエラーデモ</h5>
+            </div>
+            <div class="card-body">
+                <p>New Relic Browserで検知できるフロントエンドのJavaScriptエラーをテストできます。</p>
+                <ul>
+                    <li><strong>TypeError / ReferenceError</strong> - 一般的なJSエラー</li>
+                    <li><strong>Promise Rejection</strong> - 非同期エラー</li>
+                    <li><strong>Network Error</strong> - API通信エラー</li>
+                    <li><strong>Custom Error</strong> - カスタム属性付きエラー</li>
+                </ul>
+                <a href="{{ url_for('performance.js_errors') }}" class="btn btn-danger">JSエラーデモを見る →</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-info mt-4">
+    <strong>📝 注意:</strong> これらのデモページは開発・テスト目的のものです。意図的にパフォーマンス問題やエラーを発生させるため、本番環境では使用しないでください。
+</div>
+{% endblock %}
