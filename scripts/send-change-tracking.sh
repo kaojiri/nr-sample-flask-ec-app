@@ -9,7 +9,9 @@ NC='\033[0m'
 
 # Load environment variables from .env file
 if [ -f .env ]; then
-    export $(cat .env | grep -v '^#' | xargs)
+    set -a
+    source .env
+    set +a
 fi
 
 # Check required environment variables
@@ -40,8 +42,8 @@ if git rev-parse --git-dir > /dev/null 2>&1; then
     GIT_USER=$(git config user.name || echo "$USER")
     GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
 
-    # Get changelog (last 5 commits)
-    CHANGELOG=$(git log -5 --pretty=format:"- %h %s" | sed 's/"/\\"/g' | tr '\n' ' ')
+    # Get changelog (last 5 commits) - escape for GraphQL
+    CHANGELOG=$(git log -5 --pretty=format:"%h %s" | sed 's/"/\\"/g' | tr '\n' '; ')
 else
     COMMIT_HASH="unknown"
     SHORT_COMMIT="unknown"
@@ -54,12 +56,23 @@ fi
 # Prepare version string
 VERSION="v${SHORT_COMMIT}"
 
-# Prepare GraphQL mutation using changeTrackingCreateEvent
-read -r -d '' GRAPHQL_MUTATION <<EOF || true
-{
-  "query": "mutation { changeTrackingCreateEvent(event: { category: \\\"Deployment\\\", type: \\\"Basic\\\", version: \\\"${VERSION}\\\", entityGuid: \\\"${NEW_RELIC_ENTITY_GUID}\\\", user: \\\"${GIT_USER}\\\", timestamp: ${TIMESTAMP}, description: \\\"${COMMIT_MESSAGE}\\\", commit: \\\"${COMMIT_HASH}\\\", changelog: \\\"${CHANGELOG}\\\", customAttributes: { deployment_method: \\\"docker-compose\\\", environment: \\\"${ENVIRONMENT}\\\", triggered_by: \\\"rebuild-and-start.sh\\\", git_branch: \\\"${GIT_BRANCH}\\\" } }) { eventId entityGuid timestamp version category type } }"
-}
-EOF
+# Prepare entity search query
+ENTITY_QUERY="id = '${NEW_RELIC_ENTITY_GUID}'"
+
+# Prepare GraphQL mutation using correct changeTrackingCreateEvent schema
+GRAPHQL_MUTATION=$(jq -n \
+  --arg version "$VERSION" \
+  --arg entityQuery "$ENTITY_QUERY" \
+  --arg user "$GIT_USER" \
+  --arg description "$COMMIT_MESSAGE" \
+  --arg commit "$COMMIT_HASH" \
+  --arg changelog "$CHANGELOG" \
+  --arg environment "$ENVIRONMENT" \
+  --arg branch "$GIT_BRANCH" \
+  '{
+    query: ("mutation { changeTrackingCreateEvent(changeTrackingEvent: { categoryAndTypeData: { categoryFields: { deployment: { version: " + ($version | @json) + ", commit: " + ($commit | @json) + ", changelog: " + ($changelog | @json) + " } }, kind: { category: \"deployment\", type: \"basic\" } }, entitySearch: { query: " + ($entityQuery | @json) + " }, user: " + ($user | @json) + ", description: " + ($description | @json) + ", customAttributes: { deployment_method: \"docker-compose\", environment: " + ($environment | @json) + ", triggered_by: \"rebuild-and-start.sh\", git_branch: " + ($branch | @json) + " } }) { changeTrackingEvent { shortDescription } } }")
+  }'
+)
 
 # Send to New Relic NerdGraph API
 echo -e "${YELLOW}Sending change tracking event to New Relic...${NC}"
@@ -70,6 +83,10 @@ echo -e "${YELLOW}User: ${GIT_USER}${NC}"
 echo -e "${YELLOW}Branch: ${GIT_BRANCH}${NC}"
 echo -e "${YELLOW}Environment: ${ENVIRONMENT}${NC}"
 echo -e "${YELLOW}Description: ${COMMIT_MESSAGE}${NC}"
+echo -e "${YELLOW}Entity GUID: ${NEW_RELIC_ENTITY_GUID}${NC}"
+
+# Debug: Print the GraphQL mutation
+# echo "$GRAPHQL_MUTATION" | jq '.'
 
 RESPONSE=$(curl -s -X POST https://api.newrelic.com/graphql \
   -H "Content-Type: application/json" \
@@ -83,11 +100,11 @@ if echo "$RESPONSE" | grep -q '"errors"'; then
     exit 0  # Exit gracefully without failing the build
 fi
 
-# Check for successful event ID
-if echo "$RESPONSE" | grep -q '"eventId"'; then
-    EVENT_ID=$(echo "$RESPONSE" | jq -r '.data.changeTrackingCreateEvent.eventId' 2>/dev/null)
+# Check for successful response
+if echo "$RESPONSE" | grep -q '"changeTrackingEvent"'; then
     echo -e "${GREEN}✓ Change tracking event created successfully${NC}"
-    echo -e "${GREEN}  Event ID: ${EVENT_ID}${NC}"
+    DESCRIPTION=$(echo "$RESPONSE" | jq -r '.data.changeTrackingCreateEvent.changeTrackingEvent.shortDescription' 2>/dev/null)
+    echo -e "${GREEN}  Description: ${DESCRIPTION}${NC}"
     echo -e "${GREEN}  View in New Relic: https://one.newrelic.com/${NC}"
 else
     echo -e "${YELLOW}Change tracking event response:${NC}"
