@@ -33,6 +33,14 @@ echo -e "${GREEN}=== 起動完了 ===${NC}"
 echo -e "${GREEN}アプリケーション: http://localhost:5001${NC}"
 echo ""
 echo -e "${YELLOW}New Relic の接続を確認:${NC}"
+echo ""
+
+# Send deployment marker to New Relic Change Tracking
+if [ -f scripts/send-change-tracking.sh ]; then
+    echo -e "${YELLOW}New Relic Change Tracking にデプロイメントを記録中...${NC}"
+    ./scripts/send-change-tracking.sh
+    echo ""
+fi
 docker-compose logs web | grep -i "new relic" || echo -e "${RED}New Relic のログが見つかりません${NC}"
 echo ""
 echo -e "${YELLOW}リアルタイムログを見る:${NC}"

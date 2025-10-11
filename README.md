@@ -176,7 +176,7 @@ kubectl logs -f deployment/flask-ec-app -n flask-ec-app
 
 - **自動収集される情報**: リクエスト/レスポンスタイム、エラー率、データベースクエリ、分散トレーシング
 - **ダッシュボード**: https://one.newrelic.com/
-- **設定済みライセンスキー**: `dc3ab4dd75693d8f2a8f71c02a0a513dFFFFNRAL`
+- **ライセンスキー**: 環境変数 `NEW_RELIC_LICENSE_KEY` で設定
 
 詳細は [NEW_RELIC_SETUP.md](NEW_RELIC_SETUP.md) を参照してください。
 

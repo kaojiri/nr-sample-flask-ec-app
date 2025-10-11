@@ -37,7 +37,7 @@ New Relic により以下の情報が自動的に収集されます：
 ライセンスキーは既に `docker-compose.yml` に設定されています：
 
 ```yaml
-NEW_RELIC_LICENSE_KEY=dc3ab4dd75693d8f2a8f71c02a0a513dFFFFNRAL
+NEW_RELIC_LICENSE_KEY=YOUR_LICENSE_KEY_HERE
 NEW_RELIC_APP_NAME=Flask EC App (Local)
 ```
 
@@ -52,7 +52,7 @@ NEW_RELIC_APP_NAME=Flask EC App (Local)
 `.env` ファイルに以下を追加：
 
 ```bash
-NEW_RELIC_LICENSE_KEY=dc3ab4dd75693d8f2a8f71c02a0a513dFFFFNRAL
+NEW_RELIC_LICENSE_KEY=YOUR_LICENSE_KEY_HERE
 NEW_RELIC_ENVIRONMENT=development
 NEW_RELIC_APP_NAME=Flask EC App (Local)
 ```

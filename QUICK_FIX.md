@@ -54,7 +54,7 @@ docker-compose logs web | head -60
 ```
 ==========================================
 Starting with New Relic monitoring...
-License Key: a6d33b77592503eec05c...NRAL
+License Key: YOUR_LICENSE...NRAL
 License Key Length: 44 characters
 App Name: Flask-EC-App-Local              ← ✅ 正しい値
 Environment: development
@@ -103,7 +103,7 @@ docker-compose exec web python test-newrelic.py
 
    以下が表示されるはず:
    ```
-   NEW_RELIC_LICENSE_KEY=a6d33b77592503eec05cb18b178f8928FFFFNRAL
+   NEW_RELIC_LICENSE_KEY=YOUR_LICENSE_KEY_HERE
    NEW_RELIC_APP_NAME=Flask-EC-App-Local
    NEW_RELIC_ENVIRONMENT=development
    ```
