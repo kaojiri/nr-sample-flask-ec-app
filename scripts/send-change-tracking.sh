@@ -1,11 +1,22 @@
 #!/bin/bash
 set -e
 
+# New Relic Change Tracking Script
+# Sends deployment events to New Relic Change Tracking API
+#
+# Usage:
+#   ./scripts/send-change-tracking.sh              # Normal mode
+#   DEBUG_MODE=1 ./scripts/send-change-tracking.sh # Debug mode (shows API details)
+
 # Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
+BLUE='\033[0;34m'
 NC='\033[0m'
+
+# Debug mode (set to 1 to enable debug output)
+DEBUG_MODE="${DEBUG_MODE:-0}"
 
 # Load environment variables from .env file
 if [ -f .env ]; then
@@ -75,38 +86,58 @@ GRAPHQL_MUTATION=$(jq -n \
 )
 
 # Send to New Relic NerdGraph API
-echo -e "${YELLOW}Sending change tracking event to New Relic...${NC}"
-echo -e "${YELLOW}Category: Deployment${NC}"
-echo -e "${YELLOW}Type: Basic${NC}"
-echo -e "${YELLOW}Version: ${VERSION}${NC}"
-echo -e "${YELLOW}User: ${GIT_USER}${NC}"
-echo -e "${YELLOW}Branch: ${GIT_BRANCH}${NC}"
-echo -e "${YELLOW}Environment: ${ENVIRONMENT}${NC}"
-echo -e "${YELLOW}Description: ${COMMIT_MESSAGE}${NC}"
-echo -e "${YELLOW}Entity GUID: ${NEW_RELIC_ENTITY_GUID}${NC}"
+echo -e "${BLUE}📡 Sending change tracking event to New Relic...${NC}"
+echo -e "   Version: ${VERSION}"
+echo -e "   User: ${GIT_USER}"
+echo -e "   Branch: ${GIT_BRANCH}"
+echo -e "   Environment: ${ENVIRONMENT}"
+echo -e "   Description: ${COMMIT_MESSAGE}"
 
-# Debug: Print the GraphQL mutation
-# echo "$GRAPHQL_MUTATION" | jq '.'
+# Debug: Print the GraphQL mutation (only if debug mode is enabled)
+if [ "$DEBUG_MODE" = "1" ]; then
+    echo -e "${YELLOW}Debug: GraphQL mutation:${NC}"
+    echo "$GRAPHQL_MUTATION" | jq '.'
+fi
 
 RESPONSE=$(curl -s -X POST https://api.newrelic.com/graphql \
   -H "Content-Type: application/json" \
   -H "API-Key: ${NEW_RELIC_API_KEY}" \
-  -d "${GRAPHQL_MUTATION}")
+  -d "${GRAPHQL_MUTATION}" \
+  --max-time 30 \
+  --retry 2)
 
 # Check for errors in response
 if echo "$RESPONSE" | grep -q '"errors"'; then
-    echo -e "${RED}Failed to create change tracking event:${NC}"
+    echo -e "${RED}❌ Failed to create change tracking event:${NC}"
     echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
     exit 0  # Exit gracefully without failing the build
 fi
 
+# Debug: Print full response (only if debug mode is enabled)
+if [ "$DEBUG_MODE" = "1" ]; then
+    echo -e "${YELLOW}Debug: Full API response:${NC}"
+    echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+fi
+
 # Check for successful response
 if echo "$RESPONSE" | grep -q '"changeTrackingEvent"'; then
-    echo -e "${GREEN}✓ Change tracking event created successfully${NC}"
-    DESCRIPTION=$(echo "$RESPONSE" | jq -r '.data.changeTrackingCreateEvent.changeTrackingEvent.shortDescription' 2>/dev/null)
-    echo -e "${GREEN}  Description: ${DESCRIPTION}${NC}"
-    echo -e "${GREEN}  View in New Relic: https://one.newrelic.com/${NC}"
+    echo -e "${GREEN}✅ Change tracking event created successfully${NC}"
+    
+    # Get app name for better user guidance
+    APP_NAME=$(curl -s -X POST https://api.newrelic.com/graphql \
+      -H "Content-Type: application/json" \
+      -H "API-Key: ${NEW_RELIC_API_KEY}" \
+      -d "{\"query\": \"{ actor { entity(guid: \\\"${NEW_RELIC_ENTITY_GUID}\\\") { name } } }\"}" | \
+      jq -r '.data.actor.entity.name' 2>/dev/null || echo "your app")
+    
+    echo ""
+    echo -e "${BLUE}📊 View Change Tracking in New Relic:${NC}"
+    echo -e "   • APM > ${APP_NAME} > Events > Change tracking"
+    echo -e "   • Or: APM > ${APP_NAME} > Deployments"
+    echo -e "   • Direct link: https://one.newrelic.com/"
+    echo ""
+    echo -e "${YELLOW}⏱️  Note: Change tracking events may take 2-5 minutes to appear in the UI${NC}"
 else
-    echo -e "${YELLOW}Change tracking event response:${NC}"
+    echo -e "${YELLOW}⚠️  Unexpected response from New Relic API:${NC}"
     echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
 fi

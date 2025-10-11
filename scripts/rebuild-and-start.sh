@@ -37,7 +37,7 @@ echo ""
 
 # Send deployment marker to New Relic Change Tracking
 if [ -f scripts/send-change-tracking.sh ]; then
-    echo -e "${YELLOW}New Relic Change Tracking にデプロイメントを記録中...${NC}"
+    echo -e "${YELLOW}📈 New Relic Change Tracking にデプロイメントを記録中...${NC}"
     ./scripts/send-change-tracking.sh
     echo ""
 fi
