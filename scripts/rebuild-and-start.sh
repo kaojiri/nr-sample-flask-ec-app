@@ -6,6 +6,14 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Get the project root directory (parent of scripts directory)
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Change to project root directory to ensure relative paths work correctly
+cd "$PROJECT_ROOT"
+
 echo -e "${GREEN}=== Flask EC App 再ビルド＆起動 ===${NC}"
 
 # 既存のコンテナを停止・削除
@@ -38,7 +46,7 @@ echo ""
 # Send deployment marker to New Relic Change Tracking
 if [ -f scripts/send-change-tracking.sh ]; then
     echo -e "${YELLOW}📈 New Relic Change Tracking にデプロイメントを記録中...${NC}"
-    ./scripts/send-change-tracking.sh
+    scripts/send-change-tracking.sh
     echo ""
 fi
 docker-compose logs web | grep -i "new relic" || echo -e "${RED}New Relic のログが見つかりません${NC}"

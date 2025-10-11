@@ -18,6 +18,14 @@ NC='\033[0m'
 # Debug mode (set to 1 to enable debug output)
 DEBUG_MODE="${DEBUG_MODE:-0}"
 
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Get the project root directory (parent of scripts directory)
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Change to project root directory to ensure .env file is found
+cd "$PROJECT_ROOT"
+
 # Load environment variables from .env file
 if [ -f .env ]; then
     set -a
