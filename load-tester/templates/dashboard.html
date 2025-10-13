@@ -1,0 +1,2266 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Load Testing Automation</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .status-card {
+            border-left: 4px solid #28a745;
+        }
+        .status-card.running {
+            border-left-color: #ffc107;
+        }
+        .status-card.error {
+            border-left-color: #dc3545;
+        }
+        .config-section {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .control-section {
+            background-color: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+        }
+        .stats-number {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        .btn-emergency {
+            background-color: #dc3545;
+            border-color: #dc3545;
+            color: white;
+        }
+        .btn-emergency:hover {
+            background-color: #c82333;
+            border-color: #bd2130;
+            color: white;
+        }
+        .session-item {
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #f8f9fa;
+        }
+        .session-active {
+            border-color: #ffc107;
+            background-color: #fff3cd;
+        }
+        .session-completed {
+            border-color: #28a745;
+            background-color: #d4edda;
+        }
+        .session-failed {
+            border-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        .real-time-stats {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 15px;
+        }
+        .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Navigation -->
+        <div class="row">
+            <div class="col-12">
+                <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+                    <div class="container-fluid">
+                        <a class="navbar-brand" href="#"><i class="fas fa-tachometer-alt me-2"></i>Load Testing Automation</a>
+                        <span class="navbar-text">
+                            Flask EC Application Load Tester
+                        </span>
+                    </div>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Status and Control Section -->
+        <div class="row mt-4">
+            <div class="col-md-4">
+                <div class="card status-card" id="status-card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0"><i class="fas fa-info-circle me-2"></i>System Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            <strong>Status:</strong> <span id="system-status" class="badge bg-success">Ready</span>
+                        </p>
+                        <p class="card-text">
+                            <strong>Active Sessions:</strong> <span id="active-sessions">0</span>
+                        </p>
+                        <p class="card-text">
+                            <strong>Total Sessions:</strong> <span id="total-sessions">0</span>
+                        </p>
+                        <p class="card-text">
+                            <strong>Service:</strong> Load Testing Automation v1.0.0
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="control-section">
+                    <h5><i class="fas fa-play-circle me-2"></i>Load Test Control</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <button class="btn btn-success btn-lg w-100 mb-2" id="start-test-btn" onclick="showStartTestModal()">
+                                <i class="fas fa-play me-2"></i>Start Load Test
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <button class="btn btn-warning btn-lg w-100 mb-2" id="stop-test-btn" onclick="stopActiveTest()" disabled>
+                                <i class="fas fa-stop me-2"></i>Stop Load Test
+                            </button>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <button class="btn btn-info w-100" onclick="refreshStatus()">
+                                <i class="fas fa-sync-alt me-2"></i>Refresh Status
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <button class="btn btn-emergency w-100" onclick="emergencyStop()">
+                                <i class="fas fa-exclamation-triangle me-2"></i>Emergency Stop
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Real-time Statistics -->
+        <div class="row mt-4" id="real-time-stats-section" style="display: none;">
+            <div class="col-12">
+                <div class="real-time-stats">
+                    <h5><i class="fas fa-chart-line me-2"></i>Real-time Statistics</h5>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <div class="stats-number" id="rt-total-requests">0</div>
+                                <small>Total Requests</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <div class="stats-number" id="rt-success-rate">0%</div>
+                                <small>Success Rate</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <div class="stats-number" id="rt-avg-response">0ms</div>
+                                <small>Avg Response Time</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <div class="stats-number" id="rt-duration">0s</div>
+                                <small>Duration</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Statistics Dashboard -->
+        <div class="row mt-4" id="detailed-stats-section" style="display: none;">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0"><i class="fas fa-chart-bar me-2"></i>Detailed Statistics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="stats-card bg-primary text-white p-3 rounded mb-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-0">Total Requests</h6>
+                                            <h3 class="mb-0" id="detailed-total-requests">0</h3>
+                                        </div>
+                                        <i class="fas fa-paper-plane fa-2x opacity-75"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="stats-card bg-success text-white p-3 rounded mb-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-0">Successful Requests</h6>
+                                            <h3 class="mb-0" id="detailed-successful-requests">0</h3>
+                                        </div>
+                                        <i class="fas fa-check-circle fa-2x opacity-75"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="stats-card bg-danger text-white p-3 rounded mb-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-0">Failed Requests</h6>
+                                            <h3 class="mb-0" id="detailed-failed-requests">0</h3>
+                                        </div>
+                                        <i class="fas fa-times-circle fa-2x opacity-75"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="stats-card bg-info text-white p-3 rounded mb-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-0">Avg Response Time</h6>
+                                            <h3 class="mb-0" id="detailed-avg-response">0ms</h3>
+                                        </div>
+                                        <i class="fas fa-clock fa-2x opacity-75"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="stats-card bg-warning text-white p-3 rounded mb-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-0">Requests per Minute</h6>
+                                            <h3 class="mb-0" id="detailed-requests-per-minute">0</h3>
+                                        </div>
+                                        <i class="fas fa-tachometer-alt fa-2x opacity-75"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="stats-card bg-secondary text-white p-3 rounded mb-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-0">Active Workers</h6>
+                                            <h3 class="mb-0" id="detailed-active-workers">0</h3>
+                                        </div>
+                                        <i class="fas fa-users fa-2x opacity-75"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0"><i class="fas fa-list-alt me-2"></i>Endpoint Statistics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="endpoint-stats-summary">
+                            <p class="text-muted">No endpoint statistics available</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Log Section -->
+        <div class="row mt-4" id="error-log-section" style="display: none;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Recent Errors</h5>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="refreshErrorLog()">
+                            <i class="fas fa-sync-alt me-1"></i>Refresh
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="error-log-content" style="max-height: 300px; overflow-y: auto;">
+                            <p class="text-muted">No recent errors</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuration Management -->
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0"><i class="fas fa-cog me-2"></i>System Configuration</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <button class="btn btn-primary w-100 mb-2" onclick="showConfigModal()">
+                                <i class="fas fa-edit me-2"></i>Edit Configuration
+                            </button>
+                        </div>
+                        <div class="mb-3">
+                            <button class="btn btn-info w-100" onclick="loadCurrentConfig()">
+                                <i class="fas fa-download me-2"></i>Load Current Config
+                            </button>
+                        </div>
+                        <div id="current-config-summary" class="mt-3">
+                            <small class="text-muted">Click "Load Current Config" to view current settings</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0"><i class="fas fa-weight-hanging me-2"></i>Endpoint Weights</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <button class="btn btn-primary w-100 mb-2" onclick="showEndpointWeightsModal()">
+                                <i class="fas fa-balance-scale me-2"></i>Configure Weights
+                            </button>
+                        </div>
+                        <div class="mb-3">
+                            <button class="btn btn-info w-100" onclick="loadEndpointStats()">
+                                <i class="fas fa-chart-bar me-2"></i>View Endpoint Stats
+                            </button>
+                        </div>
+                        <div id="endpoint-weights-summary" class="mt-3">
+                            <small class="text-muted">Click "Configure Weights" to manage endpoint selection weights</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs Navigation -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <ul class="nav nav-tabs" id="mainTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="sessions-tab" data-bs-toggle="tab" data-bs-target="#sessions" type="button" role="tab">
+                            <i class="fas fa-list me-2"></i>Load Test Sessions
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="scheduling-tab" data-bs-toggle="tab" data-bs-target="#scheduling" type="button" role="tab">
+                            <i class="fas fa-clock me-2"></i>Scheduled Tests
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="row">
+            <div class="col-12">
+                <div class="tab-content" id="mainTabsContent">
+                    <!-- Sessions Tab -->
+                    <div class="tab-pane fade show active" id="sessions" role="tabpanel">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0"><i class="fas fa-list me-2"></i>Load Test Sessions</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="sessions-list">
+                                    <p class="text-muted">Loading sessions...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Scheduling Tab -->
+                    <div class="tab-pane fade" id="scheduling" role="tabpanel">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0"><i class="fas fa-clock me-2"></i>Scheduled Load Tests</h5>
+                                <button class="btn btn-primary" onclick="createSchedule()">
+                                    <i class="fas fa-plus me-2"></i>Create Schedule
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div id="schedules-list">
+                                    <p class="text-muted">Loading schedules...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Start Test Modal -->
+    <div class="modal fade" id="startTestModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-play-circle me-2"></i>Start Load Test</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="start-test-form">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="session-name" class="form-label">Session Name</label>
+                                    <input type="text" class="form-control" id="session-name" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="concurrent-users" class="form-label">Concurrent Users</label>
+                                    <input type="number" class="form-control" id="concurrent-users" value="10" min="1" max="50" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="duration-minutes" class="form-label">Duration (minutes)</label>
+                                    <input type="number" class="form-control" id="duration-minutes" value="30" min="1" max="120" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="timeout" class="form-label">Request Timeout (seconds)</label>
+                                    <input type="number" class="form-control" id="timeout" value="30" min="1" max="300" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="interval-min" class="form-label">Min Request Interval (seconds)</label>
+                                    <input type="number" class="form-control" id="interval-min" value="1.0" min="0.1" step="0.1" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="interval-max" class="form-label">Max Request Interval (seconds)</label>
+                                    <input type="number" class="form-control" id="interval-max" value="5.0" min="0.1" step="0.1" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="max-errors" class="form-label">Max Errors per Minute</label>
+                            <input type="number" class="form-control" id="max-errors" value="100" min="1" required>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="enable-logging" checked>
+                                <label class="form-check-label" for="enable-logging">
+                                    Enable detailed logging
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" onclick="startLoadTest()">
+                        <i class="fas fa-play me-2"></i>Start Test
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuration Modal -->
+    <div class="modal fade" id="configModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-cog me-2"></i>System Configuration</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        These settings affect the default behavior of the load testing system. Changes will be applied immediately.
+                    </div>
+                    <form id="config-form">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="config-target-url" class="form-label">Target Application URL</label>
+                                    <input type="url" class="form-control" id="config-target-url" required>
+                                    <div class="form-text">Base URL of the application to test</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="config-log-level" class="form-label">Log Level</label>
+                                    <select class="form-select" id="config-log-level">
+                                        <option value="DEBUG">DEBUG</option>
+                                        <option value="INFO">INFO</option>
+                                        <option value="WARNING">WARNING</option>
+                                        <option value="ERROR">ERROR</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="config-default-users" class="form-label">Default Concurrent Users</label>
+                                    <input type="number" class="form-control" id="config-default-users" min="1" max="50" value="10">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="config-default-duration" class="form-label">Default Duration (minutes)</label>
+                                    <input type="number" class="form-control" id="config-default-duration" min="1" max="120" value="30">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="config-default-interval-min" class="form-label">Default Min Interval (seconds)</label>
+                                    <input type="number" class="form-control" id="config-default-interval-min" min="0.1" step="0.1" value="1.0">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="config-default-interval-max" class="form-label">Default Max Interval (seconds)</label>
+                                    <input type="number" class="form-control" id="config-default-interval-max" min="0.1" step="0.1" value="5.0">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="config-max-errors" class="form-label">Max Errors per Minute</label>
+                                    <input type="number" class="form-control" id="config-max-errors" min="1" value="100">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="config-request-timeout" class="form-label">Request Timeout (seconds)</label>
+                                    <input type="number" class="form-control" id="config-request-timeout" min="1" max="300" value="30">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="config-enable-logging" checked>
+                                <label class="form-check-label" for="config-enable-logging">
+                                    Enable detailed logging by default
+                                </label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="config-auto-cleanup" checked>
+                                <label class="form-check-label" for="config-auto-cleanup">
+                                    Auto-cleanup old sessions (30 days)
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+                    <div class="mt-3">
+                        <div id="config-validation-errors" class="alert alert-danger" style="display: none;"></div>
+                        <div id="config-validation-success" class="alert alert-success" style="display: none;"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-info" onclick="validateConfig()">
+                        <i class="fas fa-check me-2"></i>Validate
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="saveConfig()">
+                        <i class="fas fa-save me-2"></i>Save Configuration
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Endpoint Weights Modal -->
+    <div class="modal fade" id="endpointWeightsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-weight-hanging me-2"></i>Endpoint Weights Configuration</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Configure the probability weights for endpoint selection. Higher weights mean higher selection probability.
+                        Set weight to 0 to disable an endpoint.
+                    </div>
+                    <div id="endpoint-weights-form">
+                        <p class="text-muted">Loading endpoints...</p>
+                    </div>
+                    <div class="mt-3">
+                        <div id="weights-validation-errors" class="alert alert-danger" style="display: none;"></div>
+                        <div id="weights-validation-success" class="alert alert-success" style="display: none;"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-info" onclick="resetWeights()">
+                        <i class="fas fa-undo me-2"></i>Reset to Default
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="saveEndpointWeights()">
+                        <i class="fas fa-save me-2"></i>Save Weights
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Endpoint Stats Modal -->
+    <div class="modal fade" id="endpointStatsModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-chart-bar me-2"></i>Endpoint Statistics</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="endpoint-stats-content">
+                        <p class="text-muted">Loading endpoint statistics...</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-info" onclick="refreshEndpointStats()">
+                        <i class="fas fa-sync-alt me-2"></i>Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Schedule Modal -->
+    <div class="modal fade" id="createScheduleModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-clock me-2"></i>Create Scheduled Load Test</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="schedule-form">
+                        <!-- Basic Schedule Information -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="schedule-name" class="form-label">Schedule Name</label>
+                                    <input type="text" class="form-control" id="schedule-name" required>
+                                    <div class="form-text">Unique name for this scheduled test</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="schedule-type" class="form-label">Schedule Type</label>
+                                    <select class="form-select" id="schedule-type" onchange="updateScheduleTypeFields()" required>
+                                        <option value="one_time">One Time</option>
+                                        <option value="recurring">Recurring</option>
+                                        <option value="cron">Cron Expression</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Schedule Type Specific Fields -->
+                        <div id="one-time-fields" style="display: block;">
+                            <div class="mb-3">
+                                <label for="schedule-start-time" class="form-label">Start Time</label>
+                                <input type="datetime-local" class="form-control" id="schedule-start-time">
+                                <div class="form-text">When to execute this one-time test</div>
+                            </div>
+                        </div>
+
+                        <div id="recurring-fields" style="display: none;">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="schedule-interval-minutes" class="form-label">Interval (minutes)</label>
+                                        <input type="number" class="form-control" id="schedule-interval-minutes" min="1" value="60">
+                                        <div class="form-text">How often to repeat the test</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="schedule-max-executions" class="form-label">Max Executions (optional)</label>
+                                        <input type="number" class="form-control" id="schedule-max-executions" min="1">
+                                        <div class="form-text">Leave empty for unlimited</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="cron-fields" style="display: none;">
+                            <div class="mb-3">
+                                <label for="schedule-cron-expression" class="form-label">Cron Expression</label>
+                                <input type="text" class="form-control" id="schedule-cron-expression" placeholder="0 */6 * * *">
+                                <div class="form-text">
+                                    Standard cron format: minute hour day month weekday<br>
+                                    Examples: "0 */6 * * *" (every 6 hours), "0 9 * * 1-5" (9 AM weekdays)
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Load Test Configuration -->
+                        <hr>
+                        <h6>Load Test Configuration</h6>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="schedule-session-name" class="form-label">Session Name Template</label>
+                                    <input type="text" class="form-control" id="schedule-session-name" value="Scheduled Test" required>
+                                    <div class="form-text">Base name for generated sessions</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="schedule-users" class="form-label">Concurrent Users</label>
+                                    <input type="number" class="form-control" id="schedule-users" value="10" min="1" max="50" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="schedule-duration" class="form-label">Duration (minutes)</label>
+                                    <input type="number" class="form-control" id="schedule-duration" value="30" min="1" max="120" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="schedule-timeout" class="form-label">Request Timeout (seconds)</label>
+                                    <input type="number" class="form-control" id="schedule-timeout" value="30" min="1" max="300" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="schedule-interval-min" class="form-label">Min Request Interval (seconds)</label>
+                                    <input type="number" class="form-control" id="schedule-interval-min" value="1.0" min="0.1" step="0.1" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="schedule-interval-max" class="form-label">Max Request Interval (seconds)</label>
+                                    <input type="number" class="form-control" id="schedule-interval-max" value="5.0" min="0.1" step="0.1" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="schedule-max-errors" class="form-label">Max Errors per Minute</label>
+                            <input type="number" class="form-control" id="schedule-max-errors" value="100" min="1" required>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="schedule-enable-logging" checked>
+                                        <label class="form-check-label" for="schedule-enable-logging">
+                                            Enable detailed logging
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="schedule-enabled" checked>
+                                        <label class="form-check-label" for="schedule-enabled">
+                                            Enable schedule immediately
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" onclick="saveSchedule()">
+                        <i class="fas fa-save me-2"></i>Create Schedule
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentActiveSession = null;
+        let statusUpdateInterval = null;
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshStatus();
+            loadSessions();
+            
+            // Generate default session name
+            const now = new Date();
+            const defaultName = `test-${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}-${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}`;
+            document.getElementById('session-name').value = defaultName;
+        });
+
+        async function refreshStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                updateStatusDisplay(data);
+                
+                // Update active session info
+                if (data.active_session_ids && data.active_session_ids.length > 0) {
+                    currentActiveSession = data.active_session_ids[0];
+                    startRealTimeUpdates();
+                } else {
+                    currentActiveSession = null;
+                    stopRealTimeUpdates();
+                }
+                
+            } catch (error) {
+                console.error('Error refreshing status:', error);
+                showAlert('Error refreshing status', 'danger');
+            }
+        }
+
+        function updateStatusDisplay(data) {
+            const statusElement = document.getElementById('system-status');
+            const statusCard = document.getElementById('status-card');
+            
+            // Update status badge
+            statusElement.className = 'badge';
+            statusCard.className = 'card status-card';
+            
+            switch(data.status) {
+                case 'running':
+                    statusElement.classList.add('bg-warning');
+                    statusCard.classList.add('running');
+                    statusElement.textContent = 'Running';
+                    break;
+                case 'error':
+                    statusElement.classList.add('bg-danger');
+                    statusCard.classList.add('error');
+                    statusElement.textContent = 'Error';
+                    break;
+                default:
+                    statusElement.classList.add('bg-success');
+                    statusElement.textContent = 'Ready';
+            }
+            
+            document.getElementById('active-sessions').textContent = data.active_sessions;
+            document.getElementById('total-sessions').textContent = data.total_sessions || 0;
+            
+            // Update control buttons
+            const startBtn = document.getElementById('start-test-btn');
+            const stopBtn = document.getElementById('stop-test-btn');
+            
+            if (data.active_sessions > 0) {
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+            } else {
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+            }
+        }
+
+        function showStartTestModal() {
+            const modal = new bootstrap.Modal(document.getElementById('startTestModal'));
+            modal.show();
+        }
+
+        async function startLoadTest() {
+            try {
+                const formData = {
+                    session_name: document.getElementById('session-name').value,
+                    concurrent_users: parseInt(document.getElementById('concurrent-users').value),
+                    duration_minutes: parseInt(document.getElementById('duration-minutes').value),
+                    request_interval_min: parseFloat(document.getElementById('interval-min').value),
+                    request_interval_max: parseFloat(document.getElementById('interval-max').value),
+                    max_errors_per_minute: parseInt(document.getElementById('max-errors').value),
+                    enable_logging: document.getElementById('enable-logging').checked,
+                    timeout: parseInt(document.getElementById('timeout').value),
+                    endpoint_weights: {}
+                };
+                
+                // Validate form
+                if (formData.request_interval_max <= formData.request_interval_min) {
+                    showAlert('Max interval must be greater than min interval', 'danger');
+                    return;
+                }
+                
+                const response = await fetch('/api/load-test/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert('Load test started successfully!', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('startTestModal')).hide();
+                    refreshStatus();
+                    loadSessions();
+                } else {
+                    showAlert(result.detail || 'Failed to start load test', 'danger');
+                }
+                
+            } catch (error) {
+                console.error('Error starting load test:', error);
+                showAlert('Error starting load test', 'danger');
+            }
+        }
+
+        async function stopActiveTest() {
+            if (!currentActiveSession) {
+                showAlert('No active session to stop', 'warning');
+                return;
+            }
+            
+            if (!confirm('Are you sure you want to stop the active load test?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/load-test/stop/${currentActiveSession}`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert('Load test stopped successfully!', 'success');
+                    refreshStatus();
+                    loadSessions();
+                } else {
+                    showAlert(result.detail || 'Failed to stop load test', 'danger');
+                }
+                
+            } catch (error) {
+                console.error('Error stopping load test:', error);
+                showAlert('Error stopping load test', 'danger');
+            }
+        }
+
+        async function emergencyStop() {
+            if (!confirm('Are you sure you want to perform an emergency stop? This will immediately stop all active load tests.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/load-test/emergency-stop', {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert('Emergency stop completed!', 'warning');
+                    refreshStatus();
+                    loadSessions();
+                } else {
+                    showAlert(result.detail || 'Emergency stop failed', 'danger');
+                }
+                
+            } catch (error) {
+                console.error('Error during emergency stop:', error);
+                showAlert('Error during emergency stop', 'danger');
+            }
+        }
+
+        async function loadSessions() {
+            try {
+                const response = await fetch('/api/load-test/sessions');
+                const data = await response.json();
+                
+                displaySessionsWithStats(data.sessions);
+                
+            } catch (error) {
+                console.error('Error loading sessions:', error);
+                document.getElementById('sessions-list').innerHTML = '<p class="text-danger">Error loading sessions</p>';
+            }
+        }
+
+        function displaySessions(sessions) {
+            const container = document.getElementById('sessions-list');
+            
+            if (!sessions || sessions.length === 0) {
+                container.innerHTML = '<p class="text-muted">No load test sessions found</p>';
+                return;
+            }
+            
+            // Sort sessions by created time (newest first)
+            sessions.sort((a, b) => new Date(b.created_time) - new Date(a.created_time));
+            
+            let html = '';
+            sessions.forEach(session => {
+                const statusClass = getSessionStatusClass(session.status);
+                const statusIcon = getSessionStatusIcon(session.status);
+                const duration = session.duration_seconds ? `${Math.round(session.duration_seconds)}s` : 'N/A';
+                
+                html += `
+                    <div class="session-item ${statusClass}">
+                        <div class="row align-items-center">
+                            <div class="col-md-3">
+                                <strong>${session.config.session_name}</strong><br>
+                                <small class="text-muted">${session.id}</small>
+                            </div>
+                            <div class="col-md-2">
+                                <span class="badge ${getStatusBadgeClass(session.status)}">
+                                    <i class="${statusIcon} me-1"></i>${session.status}
+                                </span>
+                            </div>
+                            <div class="col-md-2">
+                                <small>Users: ${session.config.concurrent_users}</small><br>
+                                <small>Duration: ${duration}</small>
+                            </div>
+                            <div class="col-md-3">
+                                <small>Requests: ${session.total_requests}</small><br>
+                                <small>Success: ${session.successful_requests} (${session.total_requests > 0 ? Math.round((session.successful_requests / session.total_requests) * 100) : 0}%)</small>
+                            </div>
+                            <div class="col-md-2">
+                                ${session.status === 'running' ? 
+                                    `<button class="btn btn-sm btn-warning" onclick="stopSession('${session.id}')">
+                                        <i class="fas fa-stop"></i> Stop
+                                    </button>` : 
+                                    session.status === 'completed' || session.status === 'failed' || session.status === 'cancelled' ?
+                                    `<button class="btn btn-sm btn-outline-danger" onclick="deleteSession('${session.id}')">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </button>` : ''
+                                }
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function getSessionStatusClass(status) {
+            switch(status) {
+                case 'running':
+                case 'starting':
+                    return 'session-active';
+                case 'completed':
+                    return 'session-completed';
+                case 'failed':
+                case 'cancelled':
+                    return 'session-failed';
+                default:
+                    return '';
+            }
+        }
+
+        function getSessionStatusIcon(status) {
+            switch(status) {
+                case 'running':
+                    return 'fas fa-play';
+                case 'starting':
+                    return 'fas fa-spinner fa-spin';
+                case 'stopping':
+                    return 'fas fa-stop';
+                case 'completed':
+                    return 'fas fa-check';
+                case 'failed':
+                    return 'fas fa-times';
+                case 'cancelled':
+                    return 'fas fa-ban';
+                default:
+                    return 'fas fa-question';
+            }
+        }
+
+        function getStatusBadgeClass(status) {
+            switch(status) {
+                case 'running':
+                    return 'bg-warning';
+                case 'starting':
+                    return 'bg-info';
+                case 'stopping':
+                    return 'bg-secondary';
+                case 'completed':
+                    return 'bg-success';
+                case 'failed':
+                    return 'bg-danger';
+                case 'cancelled':
+                    return 'bg-secondary';
+                default:
+                    return 'bg-light text-dark';
+            }
+        }
+
+        async function stopSession(sessionId) {
+            if (!confirm('Are you sure you want to stop this session?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/load-test/stop/${sessionId}`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert('Session stopped successfully!', 'success');
+                    refreshStatus();
+                    loadSessions();
+                } else {
+                    showAlert(result.detail || 'Failed to stop session', 'danger');
+                }
+                
+            } catch (error) {
+                console.error('Error stopping session:', error);
+                showAlert('Error stopping session', 'danger');
+            }
+        }
+
+        async function deleteSession(sessionId) {
+            if (!confirm('Are you sure you want to delete this session? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/load-test/sessions/${sessionId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert('Session deleted successfully!', 'success');
+                    loadSessions();
+                } else {
+                    showAlert(result.detail || 'Failed to delete session', 'danger');
+                }
+                
+            } catch (error) {
+                console.error('Error deleting session:', error);
+                showAlert('Error deleting session', 'danger');
+            }
+        }
+
+        function startRealTimeUpdates() {
+            if (statusUpdateInterval) {
+                clearInterval(statusUpdateInterval);
+            }
+            
+            document.getElementById('real-time-stats-section').style.display = 'block';
+            document.getElementById('detailed-stats-section').style.display = 'block';
+            document.getElementById('error-log-section').style.display = 'block';
+            
+            statusUpdateInterval = setInterval(async () => {
+                if (currentActiveSession) {
+                    await updateRealTimeStats();
+                    await updateDetailedStats();
+                    await updateEndpointStatsSummary();
+                }
+                await refreshStatus();
+                await loadSessions();
+            }, 3000); // Update every 3 seconds
+        }
+
+        function stopRealTimeUpdates() {
+            if (statusUpdateInterval) {
+                clearInterval(statusUpdateInterval);
+                statusUpdateInterval = null;
+            }
+            
+            document.getElementById('real-time-stats-section').style.display = 'none';
+            document.getElementById('detailed-stats-section').style.display = 'none';
+            document.getElementById('error-log-section').style.display = 'none';
+        }
+
+        async function updateRealTimeStats() {
+            if (!currentActiveSession) return;
+            
+            try {
+                const response = await fetch(`/api/load-test/status/${currentActiveSession}`);
+                const data = await response.json();
+                
+                if (response.ok && data.real_time_stats) {
+                    const stats = data.real_time_stats;
+                    document.getElementById('rt-total-requests').textContent = stats.total_requests || 0;
+                    document.getElementById('rt-success-rate').textContent = `${Math.round(stats.success_rate || 0)}%`;
+                    document.getElementById('rt-avg-response').textContent = `${Math.round(stats.average_response_time || 0)}ms`;
+                    
+                    if (data.duration_seconds) {
+                        document.getElementById('rt-duration').textContent = `${Math.round(data.duration_seconds)}s`;
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error updating real-time stats:', error);
+            }
+        }
+
+        function showAlert(message, type) {
+            // Create alert element
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+            alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            document.body.appendChild(alertDiv);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 5000);
+        }
+
+        // Configuration Management Functions
+        function showConfigModal() {
+            loadCurrentConfig();
+            const modal = new bootstrap.Modal(document.getElementById('configModal'));
+            modal.show();
+        }
+
+        async function loadCurrentConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    populateConfigForm(data.config);
+                    displayConfigSummary(data.config);
+                } else {
+                    showAlert('Failed to load configuration', 'danger');
+                }
+                
+            } catch (error) {
+                console.error('Error loading config:', error);
+                showAlert('Error loading configuration', 'danger');
+            }
+        }
+
+        function populateConfigForm(config) {
+            document.getElementById('config-target-url').value = config.target_app_url || '';
+            document.getElementById('config-log-level').value = config.log_level || 'INFO';
+            document.getElementById('config-default-users').value = config.default_concurrent_users || 10;
+            document.getElementById('config-default-duration').value = config.default_duration_minutes || 30;
+            document.getElementById('config-default-interval-min').value = config.default_request_interval_min || 1.0;
+            document.getElementById('config-default-interval-max').value = config.default_request_interval_max || 5.0;
+            document.getElementById('config-max-errors').value = config.max_errors_per_minute || 100;
+            document.getElementById('config-request-timeout').value = config.request_timeout || 30;
+            document.getElementById('config-enable-logging').checked = config.enable_logging !== false;
+            document.getElementById('config-auto-cleanup').checked = config.auto_cleanup !== false;
+        }
+
+        function displayConfigSummary(config) {
+            const summary = document.getElementById('current-config-summary');
+            summary.innerHTML = `
+                <div class="small">
+                    <strong>Target URL:</strong> ${config.target_app_url || 'Not set'}<br>
+                    <strong>Log Level:</strong> ${config.log_level || 'INFO'}<br>
+                    <strong>Default Users:</strong> ${config.default_concurrent_users || 10}<br>
+                    <strong>Default Duration:</strong> ${config.default_duration_minutes || 30} minutes<br>
+                    <strong>Request Timeout:</strong> ${config.request_timeout || 30}s
+                </div>
+            `;
+        }
+
+        function validateConfig() {
+            const errors = [];
+            const targetUrl = document.getElementById('config-target-url').value;
+            const minInterval = parseFloat(document.getElementById('config-default-interval-min').value);
+            const maxInterval = parseFloat(document.getElementById('config-default-interval-max').value);
+            
+            if (!targetUrl) {
+                errors.push('Target URL is required');
+            } else {
+                try {
+                    new URL(targetUrl);
+                } catch {
+                    errors.push('Target URL must be a valid URL');
+                }
+            }
+            
+            if (maxInterval <= minInterval) {
+                errors.push('Max interval must be greater than min interval');
+            }
+            
+            const errorDiv = document.getElementById('config-validation-errors');
+            const successDiv = document.getElementById('config-validation-success');
+            
+            if (errors.length > 0) {
+                errorDiv.innerHTML = '<strong>Validation Errors:</strong><ul>' + 
+                    errors.map(error => `<li>${error}</li>`).join('') + '</ul>';
+                errorDiv.style.display = 'block';
+                successDiv.style.display = 'none';
+                return false;
+            } else {
+                errorDiv.style.display = 'none';
+                successDiv.innerHTML = '<i class="fas fa-check me-2"></i>Configuration is valid!';
+                successDiv.style.display = 'block';
+                return true;
+            }
+        }
+
+        async function saveConfig() {
+            if (!validateConfig()) {
+                return;
+            }
+            
+            try {
+                const configData = {
+                    target_app_url: document.getElementById('config-target-url').value,
+                    log_level: document.getElementById('config-log-level').value,
+                    default_concurrent_users: parseInt(document.getElementById('config-default-users').value),
+                    default_duration_minutes: parseInt(document.getElementById('config-default-duration').value),
+                    default_request_interval_min: parseFloat(document.getElementById('config-default-interval-min').value),
+                    default_request_interval_max: parseFloat(document.getElementById('config-default-interval-max').value),
+                    max_errors_per_minute: parseInt(document.getElementById('config-max-errors').value),
+                    request_timeout: parseInt(document.getElementById('config-request-timeout').value),
+                    enable_logging: document.getElementById('config-enable-logging').checked,
+                    auto_cleanup: document.getElementById('config-auto-cleanup').checked
+                };
+                
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ config: configData })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert('Configuration saved successfully!', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('configModal')).hide();
+                    displayConfigSummary(configData);
+                } else {
+                    showAlert(result.detail || 'Failed to save configuration', 'danger');
+                }
+                
+            } catch (error) {
+                console.error('Error saving config:', error);
+                showAlert('Error saving configuration', 'danger');
+            }
+        }
+
+        // Endpoint Weights Management Functions
+        function showEndpointWeightsModal() {
+            loadEndpointWeights();
+            const modal = new bootstrap.Modal(document.getElementById('endpointWeightsModal'));
+            modal.show();
+        }
+
+        async function loadEndpointWeights() {
+            try {
+                const response = await fetch('/api/endpoints');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayEndpointWeightsForm(data.endpoints);
+                    displayEndpointWeightsSummary(data.endpoints);
+                } else {
+                    showAlert('Failed to load endpoints', 'danger');
+                }
+                
+            } catch (error) {
+                console.error('Error loading endpoints:', error);
+                showAlert('Error loading endpoints', 'danger');
+            }
+        }
+
+        function displayEndpointWeightsForm(endpoints) {
+            const container = document.getElementById('endpoint-weights-form');
+            
+            if (!endpoints || Object.keys(endpoints).length === 0) {
+                container.innerHTML = '<p class="text-muted">No endpoints configured</p>';
+                return;
+            }
+            
+            let html = '<div class="row">';
+            
+            Object.entries(endpoints).forEach(([name, endpoint], index) => {
+                if (index > 0 && index % 2 === 0) {
+                    html += '</div><div class="row">';
+                }
+                
+                html += `
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-title">${name}</h6>
+                                <p class="card-text small text-muted">${endpoint.description || endpoint.url}</p>
+                                <div class="mb-2">
+                                    <label for="weight-${name}" class="form-label">Weight</label>
+                                    <input type="number" class="form-control" id="weight-${name}" 
+                                           value="${endpoint.weight || 1.0}" min="0" max="10" step="0.1">
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="enabled-${name}" 
+                                           ${endpoint.weight > 0 ? 'checked' : ''}>
+                                    <label class="form-check-label" for="enabled-${name}">
+                                        Enabled
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+            
+            // Add event listeners to sync checkbox and weight
+            Object.keys(endpoints).forEach(name => {
+                const weightInput = document.getElementById(`weight-${name}`);
+                const enabledCheckbox = document.getElementById(`enabled-${name}`);
+                
+                enabledCheckbox.addEventListener('change', function() {
+                    if (!this.checked) {
+                        weightInput.value = '0';
+                    } else if (weightInput.value === '0') {
+                        weightInput.value = '1.0';
+                    }
+                });
+                
+                weightInput.addEventListener('change', function() {
+                    enabledCheckbox.checked = parseFloat(this.value) > 0;
+                });
+            });
+        }
+
+        function displayEndpointWeightsSummary(endpoints) {
+            const summary = document.getElementById('endpoint-weights-summary');
+            
+            if (!endpoints || Object.keys(endpoints).length === 0) {
+                summary.innerHTML = '<small class="text-muted">No endpoints configured</small>';
+                return;
+            }
+            
+            const enabledEndpoints = Object.entries(endpoints).filter(([name, endpoint]) => endpoint.weight > 0);
+            const totalWeight = enabledEndpoints.reduce((sum, [name, endpoint]) => sum + endpoint.weight, 0);
+            
+            let html = '<div class="small">';
+            html += `<strong>Enabled Endpoints:</strong> ${enabledEndpoints.length}/${Object.keys(endpoints).length}<br>`;
+            html += '<strong>Weights:</strong><br>';
+            
+            enabledEndpoints.forEach(([name, endpoint]) => {
+                const percentage = totalWeight > 0 ? Math.round((endpoint.weight / totalWeight) * 100) : 0;
+                html += `&nbsp;&nbsp;${name}: ${endpoint.weight} (${percentage}%)<br>`;
+            });
+            
+            html += '</div>';
+            summary.innerHTML = html;
+        }
+
+        function resetWeights() {
+            if (!confirm('Are you sure you want to reset all weights to default values (1.0)?')) {
+                return;
+            }
+            
+            const weightInputs = document.querySelectorAll('[id^="weight-"]');
+            const enabledCheckboxes = document.querySelectorAll('[id^="enabled-"]');
+            
+            weightInputs.forEach(input => {
+                input.value = '1.0';
+            });
+            
+            enabledCheckboxes.forEach(checkbox => {
+                checkbox.checked = true;
+            });
+            
+            showAlert('Weights reset to default values', 'info');
+        }
+
+        async function saveEndpointWeights() {
+            try {
+                const weights = {};
+                const weightInputs = document.querySelectorAll('[id^="weight-"]');
+                
+                weightInputs.forEach(input => {
+                    const name = input.id.replace('weight-', '');
+                    weights[name] = parseFloat(input.value) || 0;
+                });
+                
+                const response = await fetch('/api/endpoints/weights', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ weights })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert('Endpoint weights saved successfully!', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('endpointWeightsModal')).hide();
+                    
+                    // Refresh the summary
+                    const endpointsResponse = await fetch('/api/endpoints');
+                    const endpointsData = await endpointsResponse.json();
+                    if (endpointsResponse.ok) {
+                        displayEndpointWeightsSummary(endpointsData.endpoints);
+                    }
+                } else {
+                    showAlert(result.detail || 'Failed to save endpoint weights', 'danger');
+                }
+                
+            } catch (error) {
+                console.error('Error saving endpoint weights:', error);
+                showAlert('Error saving endpoint weights', 'danger');
+            }
+        }
+
+        // Endpoint Statistics Functions
+        async function loadEndpointStats() {
+            const modal = new bootstrap.Modal(document.getElementById('endpointStatsModal'));
+            modal.show();
+            await refreshEndpointStats();
+        }
+
+        async function refreshEndpointStats() {
+            try {
+                const response = await fetch('/api/endpoints/stats');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayEndpointStats(data.stats);
+                } else {
+                    document.getElementById('endpoint-stats-content').innerHTML = 
+                        '<p class="text-danger">Failed to load endpoint statistics</p>';
+                }
+                
+            } catch (error) {
+                console.error('Error loading endpoint stats:', error);
+                document.getElementById('endpoint-stats-content').innerHTML = 
+                    '<p class="text-danger">Error loading endpoint statistics</p>';
+            }
+        }
+
+        function displayEndpointStats(stats) {
+            const container = document.getElementById('endpoint-stats-content');
+            
+            if (!stats || Object.keys(stats).length === 0) {
+                container.innerHTML = '<p class="text-muted">No endpoint statistics available</p>';
+                return;
+            }
+            
+            let html = '<div class="table-responsive">';
+            html += '<table class="table table-striped">';
+            html += `
+                <thead>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Total Requests</th>
+                        <th>Successful</th>
+                        <th>Failed</th>
+                        <th>Success Rate</th>
+                        <th>Avg Response Time</th>
+                        <th>Last Accessed</th>
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+            
+            Object.entries(stats).forEach(([name, stat]) => {
+                const successRate = stat.success_rate ? `${Math.round(stat.success_rate)}%` : '0%';
+                const avgResponseTime = stat.average_response_time ? `${Math.round(stat.average_response_time)}ms` : 'N/A';
+                const lastAccessed = stat.last_accessed ? new Date(stat.last_accessed).toLocaleString() : 'Never';
+                
+                html += `
+                    <tr>
+                        <td><strong>${name}</strong></td>
+                        <td>${stat.total_requests || 0}</td>
+                        <td class="text-success">${stat.successful_requests || 0}</td>
+                        <td class="text-danger">${stat.failed_requests || 0}</td>
+                        <td>
+                            <span class="badge ${stat.success_rate >= 90 ? 'bg-success' : stat.success_rate >= 70 ? 'bg-warning' : 'bg-danger'}">
+                                ${successRate}
+                            </span>
+                        </td>
+                        <td>${avgResponseTime}</td>
+                        <td class="small text-muted">${lastAccessed}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+        }
+
+        // Detailed Statistics Functions
+        async function updateDetailedStats() {
+            if (!currentActiveSession) return;
+            
+            try {
+                const response = await fetch(`/api/load-test/status/${currentActiveSession}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const session = data.session;
+                    const realTimeStats = data.real_time_stats;
+                    const workerPool = data.worker_pool;
+                    
+                    // Update detailed statistics cards
+                    document.getElementById('detailed-total-requests').textContent = session.total_requests || 0;
+                    document.getElementById('detailed-successful-requests').textContent = session.successful_requests || 0;
+                    document.getElementById('detailed-failed-requests').textContent = session.failed_requests || 0;
+                    document.getElementById('detailed-avg-response').textContent = 
+                        `${Math.round(session.average_response_time || 0)}ms`;
+                    
+                    // Calculate requests per minute
+                    const durationMinutes = data.duration_seconds ? data.duration_seconds / 60 : 0;
+                    const requestsPerMinute = durationMinutes > 0 ? Math.round(session.total_requests / durationMinutes) : 0;
+                    document.getElementById('detailed-requests-per-minute').textContent = requestsPerMinute;
+                    
+                    // Update active workers
+                    document.getElementById('detailed-active-workers').textContent = 
+                        workerPool?.active_workers || session.config?.concurrent_users || 0;
+                }
+                
+            } catch (error) {
+                console.error('Error updating detailed stats:', error);
+            }
+        }
+
+        async function updateEndpointStatsSummary() {
+            try {
+                const response = await fetch('/api/endpoints/stats');
+                const data = await response.json();
+                
+                if (response.ok && data.stats) {
+                    displayEndpointStatsSummary(data.stats);
+                }
+                
+            } catch (error) {
+                console.error('Error updating endpoint stats summary:', error);
+            }
+        }
+
+        function displayEndpointStatsSummary(stats) {
+            const container = document.getElementById('endpoint-stats-summary');
+            
+            if (!stats || Object.keys(stats).length === 0) {
+                container.innerHTML = '<p class="text-muted">No endpoint statistics available</p>';
+                return;
+            }
+            
+            // Sort endpoints by total requests (descending)
+            const sortedStats = Object.entries(stats).sort((a, b) => 
+                (b[1].total_requests || 0) - (a[1].total_requests || 0)
+            );
+            
+            let html = '';
+            sortedStats.forEach(([name, stat]) => {
+                const successRate = stat.success_rate || 0;
+                const badgeClass = successRate >= 90 ? 'bg-success' : successRate >= 70 ? 'bg-warning' : 'bg-danger';
+                
+                html += `
+                    <div class="mb-3 p-2 border rounded">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <strong class="small">${name}</strong>
+                            <span class="badge ${badgeClass}">${Math.round(successRate)}%</span>
+                        </div>
+                        <div class="small text-muted">
+                            <div class="d-flex justify-content-between">
+                                <span>Requests: ${stat.total_requests || 0}</span>
+                                <span>Avg: ${Math.round(stat.average_response_time || 0)}ms</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="text-success">Success: ${stat.successful_requests || 0}</span>
+                                <span class="text-danger">Failed: ${stat.failed_requests || 0}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // Error Log Functions
+        async function refreshErrorLog() {
+            if (!currentActiveSession) {
+                document.getElementById('error-log-content').innerHTML = '<p class="text-muted">No active session</p>';
+                return;
+            }
+            
+            try {
+                // Get recent metrics which may include error information
+                const response = await fetch(`/api/statistics/${currentActiveSession}/metrics?count=50`);
+                const data = await response.json();
+                
+                if (response.ok && data.metrics) {
+                    displayErrorLog(data.metrics);
+                } else {
+                    document.getElementById('error-log-content').innerHTML = '<p class="text-muted">No error data available</p>';
+                }
+                
+            } catch (error) {
+                console.error('Error refreshing error log:', error);
+                document.getElementById('error-log-content').innerHTML = '<p class="text-danger">Error loading error log</p>';
+            }
+        }
+
+        function displayErrorLog(metrics) {
+            const container = document.getElementById('error-log-content');
+            
+            // Filter for failed requests
+            const errors = metrics.filter(metric => !metric.success);
+            
+            if (errors.length === 0) {
+                container.innerHTML = '<p class="text-success"><i class="fas fa-check me-2"></i>No recent errors</p>';
+                return;
+            }
+            
+            let html = '';
+            errors.slice(0, 20).forEach(error => { // Show only last 20 errors
+                const timestamp = new Date(error.timestamp).toLocaleTimeString();
+                const statusCode = error.status_code || 'N/A';
+                const responseTime = error.response_time ? `${Math.round(error.response_time)}ms` : 'N/A';
+                
+                html += `
+                    <div class="alert alert-danger alert-sm py-2 mb-2">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>${error.endpoint_name || 'Unknown Endpoint'}</strong>
+                                <br>
+                                <small class="text-muted">
+                                    Status: ${statusCode} | Response Time: ${responseTime}
+                                    ${error.error_message ? `<br>Error: ${error.error_message}` : ''}
+                                </small>
+                            </div>
+                            <small class="text-muted">${timestamp}</small>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            if (errors.length > 20) {
+                html += `<p class="text-muted small">... and ${errors.length - 20} more errors</p>`;
+            }
+            
+            container.innerHTML = html;
+        }
+
+        // Enhanced session display with statistics
+        function displaySessionsWithStats(sessions) {
+            const container = document.getElementById('sessions-list');
+            
+            if (!sessions || sessions.length === 0) {
+                container.innerHTML = '<p class="text-muted">No load test sessions found</p>';
+                return;
+            }
+            
+            // Sort sessions by created time (newest first)
+            sessions.sort((a, b) => new Date(b.created_time) - new Date(a.created_time));
+            
+            let html = '';
+            sessions.forEach(session => {
+                const statusClass = getSessionStatusClass(session.status);
+                const statusIcon = getSessionStatusIcon(session.status);
+                const duration = session.duration_seconds ? `${Math.round(session.duration_seconds)}s` : 'N/A';
+                const successRate = session.total_requests > 0 ? 
+                    Math.round((session.successful_requests / session.total_requests) * 100) : 0;
+                const avgResponseTime = session.average_response_time ? 
+                    `${Math.round(session.average_response_time)}ms` : 'N/A';
+                
+                html += `
+                    <div class="session-item ${statusClass}">
+                        <div class="row align-items-center">
+                            <div class="col-md-3">
+                                <strong>${session.config.session_name}</strong><br>
+                                <small class="text-muted">${session.id}</small>
+                            </div>
+                            <div class="col-md-2">
+                                <span class="badge ${getStatusBadgeClass(session.status)}">
+                                    <i class="${statusIcon} me-1"></i>${session.status}
+                                </span><br>
+                                <small class="text-muted">Duration: ${duration}</small>
+                            </div>
+                            <div class="col-md-2">
+                                <small>Users: ${session.config.concurrent_users}</small><br>
+                                <small>Total: ${session.total_requests}</small>
+                            </div>
+                            <div class="col-md-3">
+                                <small>Success: ${session.successful_requests} (${successRate}%)</small><br>
+                                <small>Failed: ${session.failed_requests}</small><br>
+                                <small>Avg Response: ${avgResponseTime}</small>
+                            </div>
+                            <div class="col-md-2">
+                                ${session.status === 'running' ? 
+                                    `<button class="btn btn-sm btn-warning mb-1" onclick="stopSession('${session.id}')">
+                                        <i class="fas fa-stop"></i> Stop
+                                    </button>
+                                    <button class="btn btn-sm btn-info" onclick="viewSessionDetails('${session.id}')">
+                                        <i class="fas fa-eye"></i> Details
+                                    </button>` : 
+                                    session.status === 'completed' || session.status === 'failed' || session.status === 'cancelled' ?
+                                    `<button class="btn btn-sm btn-info mb-1" onclick="viewSessionDetails('${session.id}')">
+                                        <i class="fas fa-eye"></i> Details
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteSession('${session.id}')">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </button>` : ''
+                                }
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        async function viewSessionDetails(sessionId) {
+            try {
+                const response = await fetch(`/api/load-test/status/${sessionId}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showSessionDetailsModal(data);
+                } else {
+                    showAlert('Failed to load session details', 'danger');
+                }
+                
+            } catch (error) {
+                console.error('Error loading session details:', error);
+                showAlert('Error loading session details', 'danger');
+            }
+        }
+
+        function showSessionDetailsModal(sessionData) {
+            const session = sessionData.session;
+            const realTimeStats = sessionData.real_time_stats;
+            const workerPool = sessionData.worker_pool;
+            
+            const modalHtml = `
+                <div class="modal fade" id="sessionDetailsModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">
+                                    <i class="fas fa-info-circle me-2"></i>Session Details: ${session.config.session_name}
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>Session Information</h6>
+                                        <table class="table table-sm">
+                                            <tr><td><strong>ID:</strong></td><td>${session.id}</td></tr>
+                                            <tr><td><strong>Status:</strong></td><td><span class="badge ${getStatusBadgeClass(session.status)}">${session.status}</span></td></tr>
+                                            <tr><td><strong>Created:</strong></td><td>${new Date(session.created_time).toLocaleString()}</td></tr>
+                                            <tr><td><strong>Started:</strong></td><td>${session.start_time ? new Date(session.start_time).toLocaleString() : 'N/A'}</td></tr>
+                                            <tr><td><strong>Ended:</strong></td><td>${session.end_time ? new Date(session.end_time).toLocaleString() : 'N/A'}</td></tr>
+                                            <tr><td><strong>Duration:</strong></td><td>${sessionData.duration_seconds ? Math.round(sessionData.duration_seconds) + 's' : 'N/A'}</td></tr>
+                                        </table>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Configuration</h6>
+                                        <table class="table table-sm">
+                                            <tr><td><strong>Concurrent Users:</strong></td><td>${session.config.concurrent_users}</td></tr>
+                                            <tr><td><strong>Duration:</strong></td><td>${session.config.duration_minutes} minutes</td></tr>
+                                            <tr><td><strong>Request Interval:</strong></td><td>${session.config.request_interval_min}s - ${session.config.request_interval_max}s</td></tr>
+                                            <tr><td><strong>Timeout:</strong></td><td>${session.config.timeout}s</td></tr>
+                                            <tr><td><strong>Max Errors/min:</strong></td><td>${session.config.max_errors_per_minute}</td></tr>
+                                            <tr><td><strong>Logging:</strong></td><td>${session.config.enable_logging ? 'Enabled' : 'Disabled'}</td></tr>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-12">
+                                        <h6>Statistics</h6>
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <div class="text-center p-3 bg-primary text-white rounded">
+                                                    <h4>${session.total_requests}</h4>
+                                                    <small>Total Requests</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="text-center p-3 bg-success text-white rounded">
+                                                    <h4>${session.successful_requests}</h4>
+                                                    <small>Successful</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="text-center p-3 bg-danger text-white rounded">
+                                                    <h4>${session.failed_requests}</h4>
+                                                    <small>Failed</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="text-center p-3 bg-info text-white rounded">
+                                                    <h4>${Math.round(session.success_rate || 0)}%</h4>
+                                                    <small>Success Rate</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                ${session.error_message ? `
+                                <div class="row mt-3">
+                                    <div class="col-12">
+                                        <div class="alert alert-danger">
+                                            <strong>Error:</strong> ${session.error_message}
+                                        </div>
+                                    </div>
+                                </div>
+                                ` : ''}
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Remove existing modal if any
+            const existingModal = document.getElementById('sessionDetailsModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // Add new modal to body
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('sessionDetailsModal'));
+            modal.show();
+            
+            // Clean up modal after it's hidden
+            document.getElementById('sessionDetailsModal').addEventListener('hidden.bs.modal', function() {
+                this.remove();
+            });
+        }
+        // Scheduling Functions
+        async function loadSchedules() {
+            try {
+                const response = await fetch('/api/schedules');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displaySchedules(data.schedules);
+                } else {
+                    document.getElementById('schedules-list').innerHTML = '<p class="text-danger">Failed to load schedules</p>';
+                }
+                
+            } catch (error) {
+                console.error('Error loading schedules:', error);
+                document.getElementById('schedules-list').innerHTML = '<p class="text-danger">Error loading schedules</p>';
+            }
+        }
+
+        function displaySchedules(schedules) {
+            const container = document.getElementById('schedules-list');
+            
+            if (!schedules || schedules.length === 0) {
+                container.innerHTML = '<p class="text-muted">No scheduled load tests found</p>';
+                return;
+            }
+            
+            // Sort schedules by next execution time
+            schedules.sort((a, b) => {
+                if (!a.next_execution && !b.next_execution) return 0;
+                if (!a.next_execution) return 1;
+                if (!b.next_execution) return -1;
+                return new Date(a.next_execution) - new Date(b.next_execution);
+            });
+            
+            let html = '';
+            schedules.forEach(schedule => {
+                const statusClass = getScheduleStatusClass(schedule.status);
+                const statusIcon = getScheduleStatusIcon(schedule.status);
+                const nextExecution = schedule.next_execution ? 
+                    new Date(schedule.next_execution).toLocaleString() : 'N/A';
+                const lastExecution = schedule.last_execution ? 
+                    new Date(schedule.last_execution).toLocaleString() : 'Never';
+                
+                html += `
+                    <div class="session-item ${statusClass}">
+                        <div class="row align-items-center">
+                            <div class="col-md-3">
+                                <strong>${schedule.config.name}</strong><br>
+                                <small class="text-muted">${schedule.id}</small>
+                            </div>
+                            <div class="col-md-2">
+                                <span class="badge ${getScheduleStatusBadgeClass(schedule.status)}">
+                                    <i class="${statusIcon} me-1"></i>${schedule.status}
+                                </span><br>
+                                <small class="text-muted">${schedule.config.schedule_type}</small>
+                            </div>
+                            <div class="col-md-3">
+                                <small>Next: ${nextExecution}</small><br>
+                                <small>Last: ${lastExecution}</small>
+                            </div>
+                            <div class="col-md-2">
+                                <small>Executions: ${schedule.execution_count}</small><br>
+                                <small>Users: ${schedule.config.load_test_config.concurrent_users}</small>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="btn-group-vertical" role="group">
+                                    ${schedule.status === 'active' ? 
+                                        `<button class="btn btn-sm btn-warning" onclick="disableSchedule('${schedule.id}')">
+                                            <i class="fas fa-pause"></i> Disable
+                                        </button>` : 
+                                        schedule.status === 'paused' ?
+                                        `<button class="btn btn-sm btn-success" onclick="enableSchedule('${schedule.id}')">
+                                            <i class="fas fa-play"></i> Enable
+                                        </button>` : ''
+                                    }
+                                    <button class="btn btn-sm btn-info" onclick="editSchedule('${schedule.id}')">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteSchedule('${schedule.id}')">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function getScheduleStatusClass(status) {
+            switch(status) {
+                case 'active':
+                    return 'session-active';
+                case 'completed':
+                    return 'session-completed';
+                case 'failed':
+                    return 'session-failed';
+                default:
+                    return '';
+            }
+        }
+
+        function getScheduleStatusIcon(status) {
+            switch(status) {
+                case 'active':
+                    return 'fas fa-clock';
+                case 'paused':
+                    return 'fas fa-pause';
+                case 'completed':
+                    return 'fas fa-check';
+                case 'failed':
+                    return 'fas fa-times';
+                case 'cancelled':
+                    return 'fas fa-ban';
+                default:
+                    return 'fas fa-question';
+            }
+        }
+
+        function getScheduleStatusBadgeClass(status) {
+            switch(status) {
+                case 'active':
+                    return 'bg-success';
+                case 'paused':
+                    return 'bg-warning';
+                case 'completed':
+                    return 'bg-info';
+                case 'failed':
+                    return 'bg-danger';
+                case 'cancelled':
+                    return 'bg-secondary';
+                default:
+                    return 'bg-light text-dark';
+            }
+        }
+
+        async function createSchedule() {
+            const modal = new bootstrap.Modal(document.getElementById('createScheduleModal'));
+            modal.show();
+        }
+
+        async function saveSchedule() {
+            try {
+                const formData = {
+                    name: document.getElementById('schedule-name').value,
+                    schedule_type: document.getElementById('schedule-type').value,
+                    load_test_config: {
+                        session_name: document.getElementById('schedule-session-name').value,
+                        concurrent_users: parseInt(document.getElementById('schedule-users').value),
+                        duration_minutes: parseInt(document.getElementById('schedule-duration').value),
+                        request_interval_min: parseFloat(document.getElementById('schedule-interval-min').value),
+                        request_interval_max: parseFloat(document.getElementById('schedule-interval-max').value),
+                        max_errors_per_minute: parseInt(document.getElementById('schedule-max-errors').value),
+                        enable_logging: document.getElementById('schedule-enable-logging').checked,
+                        timeout: parseInt(document.getElementById('schedule-timeout').value)
+                    },
+                    enabled: document.getElementById('schedule-enabled').checked
+                };
+
+                // Add schedule-specific fields
+                const scheduleType = document.getElementById('schedule-type').value;
+                if (scheduleType === 'one_time') {
+                    formData.start_time = document.getElementById('schedule-start-time').value;
+                } else if (scheduleType === 'recurring') {
+                    formData.interval_minutes = parseInt(document.getElementById('schedule-interval-minutes').value);
+                    const maxExecutions = document.getElementById('schedule-max-executions').value;
+                    if (maxExecutions) {
+                        formData.max_executions = parseInt(maxExecutions);
+                    }
+                } else if (scheduleType === 'cron') {
+                    formData.cron_expression = document.getElementById('schedule-cron-expression').value;
+                }
+
+                const response = await fetch('/api/schedules', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showAlert('Schedule created successfully!', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('createScheduleModal')).hide();
+                    loadSchedules();
+                } else {
+                    showAlert(result.detail || 'Failed to create schedule', 'danger');
+                }
+
+            } catch (error) {
+                console.error('Error creating schedule:', error);
+                showAlert('Error creating schedule', 'danger');
+            }
+        }
+
+        async function enableSchedule(scheduleId) {
+            try {
+                const response = await fetch(`/api/schedules/${scheduleId}/enable`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showAlert('Schedule enabled successfully!', 'success');
+                    loadSchedules();
+                } else {
+                    showAlert(result.detail || 'Failed to enable schedule', 'danger');
+                }
+
+            } catch (error) {
+                console.error('Error enabling schedule:', error);
+                showAlert('Error enabling schedule', 'danger');
+            }
+        }
+
+        async function disableSchedule(scheduleId) {
+            try {
+                const response = await fetch(`/api/schedules/${scheduleId}/disable`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showAlert('Schedule disabled successfully!', 'success');
+                    loadSchedules();
+                } else {
+                    showAlert(result.detail || 'Failed to disable schedule', 'danger');
+                }
+
+            } catch (error) {
+                console.error('Error disabling schedule:', error);
+                showAlert('Error disabling schedule', 'danger');
+            }
+        }
+
+        async function deleteSchedule(scheduleId) {
+            if (!confirm('Are you sure you want to delete this schedule? This action cannot be undone.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/schedules/${scheduleId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showAlert('Schedule deleted successfully!', 'success');
+                    loadSchedules();
+                } else {
+                    showAlert(result.detail || 'Failed to delete schedule', 'danger');
+                }
+
+            } catch (error) {
+                console.error('Error deleting schedule:', error);
+                showAlert('Error deleting schedule', 'danger');
+            }
+        }
+
+        function updateScheduleTypeFields() {
+            const scheduleType = document.getElementById('schedule-type').value;
+            
+            // Hide all schedule type specific fields
+            document.getElementById('one-time-fields').style.display = 'none';
+            document.getElementById('recurring-fields').style.display = 'none';
+            document.getElementById('cron-fields').style.display = 'none';
+            
+            // Show relevant fields
+            if (scheduleType === 'one_time') {
+                document.getElementById('one-time-fields').style.display = 'block';
+            } else if (scheduleType === 'recurring') {
+                document.getElementById('recurring-fields').style.display = 'block';
+            } else if (scheduleType === 'cron') {
+                document.getElementById('cron-fields').style.display = 'block';
+            }
+        }
+
+        // Initialize scheduling on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add scheduling tab functionality
+            const schedulingTab = document.querySelector('[data-bs-target="#scheduling"]');
+            if (schedulingTab) {
+                schedulingTab.addEventListener('shown.bs.tab', function() {
+                    loadSchedules();
+                });
+            }
+        });
+    </script>
+</body>
+</html>

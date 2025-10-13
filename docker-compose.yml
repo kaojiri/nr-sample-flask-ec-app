@@ -17,6 +17,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - flask-ec-network
 
   web:
     build: .
@@ -35,6 +37,29 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - flask-ec-network
+
+  load-tester:
+    build: ./load-tester
+    container_name: flask-ec-load-tester
+    environment:
+      - LOAD_TESTER_TARGET_APP_URL=http://web:5000
+      - LOAD_TESTER_LOG_LEVEL=INFO
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./logs:/app/logs
+      - load-test-data:/app/data
+    depends_on:
+      - web
+    networks:
+      - flask-ec-network
+
+networks:
+  flask-ec-network:
+    driver: bridge
 
 volumes:
   postgres_data:
+  load-test-data:
