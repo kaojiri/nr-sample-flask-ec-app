@@ -106,7 +106,10 @@ class ConfigManager:
                 "/performance/n-plus-one": {"weight": 1.0, "enabled": True},
                 "/performance/slow-query": {"weight": 1.0, "enabled": True},
                 "/performance/js-errors": {"weight": 1.0, "enabled": True},
-                "/performance/bad-vitals": {"weight": 1.0, "enabled": True}
+                "/performance/bad-vitals": {"weight": 1.0, "enabled": True},
+                "/performance/error": {"weight": 1.0, "enabled": True, "timeout": 30},
+                "/performance/slow-query/full-scan": {"weight": 1.0, "enabled": True, "timeout": 60},
+                "/performance/slow-query/complex-join": {"weight": 1.0, "enabled": True, "timeout": 60}
             },
             "safety": {
                 "max_concurrent_users": settings.max_concurrent_users,

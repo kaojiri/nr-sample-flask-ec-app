@@ -20,7 +20,10 @@ def test_weighted_selection_algorithm():
         "/performance/n-plus-one": {"weight": 1.0, "enabled": True},
         "/performance/slow-query": {"weight": 3.0, "enabled": True},
         "/performance/js-errors": {"weight": 1.5, "enabled": True},
-        "/performance/bad-vitals": {"weight": 1.0, "enabled": True}
+        "/performance/bad-vitals": {"weight": 1.0, "enabled": True},
+        "/performance/error": {"weight": 1.0, "enabled": True},
+        "/performance/slow-query/full-scan": {"weight": 1.0, "enabled": True},
+        "/performance/slow-query/complex-join": {"weight": 1.0, "enabled": True}
     }
     
     # Test weighted selection
@@ -88,7 +91,8 @@ def test_endpoint_stats_calculation():
     
     # Test stats for each endpoint
     endpoints = ["/performance/slow", "/performance/n-plus-one", "/performance/slow-query", 
-                "/performance/js-errors", "/performance/bad-vitals"]
+                "/performance/js-errors", "/performance/bad-vitals", "/performance/error",
+                "/performance/slow-query/full-scan", "/performance/slow-query/complex-join"]
     
     stats = {}
     for endpoint in endpoints:
@@ -125,7 +129,8 @@ def test_endpoint_url_construction():
     
     target_url = "http://app:5000"
     endpoints = ["/performance/slow", "/performance/n-plus-one", "/performance/slow-query", 
-                "/performance/js-errors", "/performance/bad-vitals"]
+                "/performance/js-errors", "/performance/bad-vitals", "/performance/error",
+                "/performance/slow-query/full-scan", "/performance/slow-query/complex-join"]
     
     print(f"Target URL: {target_url}")
     print("Constructed URLs:")
@@ -146,7 +151,10 @@ def test_weight_updates():
         "/performance/n-plus-one": {"weight": 1.0, "enabled": True},
         "/performance/slow-query": {"weight": 1.0, "enabled": True},
         "/performance/js-errors": {"weight": 1.0, "enabled": True},
-        "/performance/bad-vitals": {"weight": 1.0, "enabled": True}
+        "/performance/bad-vitals": {"weight": 1.0, "enabled": True},
+        "/performance/error": {"weight": 1.0, "enabled": True},
+        "/performance/slow-query/full-scan": {"weight": 1.0, "enabled": True},
+        "/performance/slow-query/complex-join": {"weight": 1.0, "enabled": True}
     }
     
     print("Initial weights:")
@@ -194,6 +202,9 @@ def main():
         print("  - /performance/slow-query")
         print("  - /performance/js-errors")
         print("  - /performance/bad-vitals")
+        print("  - /performance/error")
+        print("  - /performance/slow-query/full-scan")
+        print("  - /performance/slow-query/complex-join")
         print("✓ Endpoint statistics tracking")
         print("✓ Weight update functionality")
         

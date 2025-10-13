@@ -29,7 +29,10 @@ def test_requirement_2_1_endpoint_selection():
         "/performance/n-plus-one", 
         "/performance/slow-query",
         "/performance/js-errors",
-        "/performance/bad-vitals"
+        "/performance/bad-vitals",
+        "/performance/error",
+        "/performance/slow-query/full-scan",
+        "/performance/slow-query/complex-join"
     ]
     
     # Simulate endpoint configuration

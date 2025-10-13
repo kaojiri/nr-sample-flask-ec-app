@@ -88,6 +88,24 @@ class EndpointSelector:
                     "description": "Bad Core Web Vitals endpoint",
                     "weight": 1.0,
                     "enabled": True
+                },
+                "/performance/error": {
+                    "description": "General application error endpoint",
+                    "weight": 1.0,
+                    "enabled": True,
+                    "timeout": 30
+                },
+                "/performance/slow-query/full-scan": {
+                    "description": "Full table scan database query endpoint",
+                    "weight": 1.0,
+                    "enabled": True,
+                    "timeout": 60
+                },
+                "/performance/slow-query/complex-join": {
+                    "description": "Complex join database query endpoint",
+                    "weight": 1.0,
+                    "enabled": True,
+                    "timeout": 60
                 }
             }
             
@@ -100,7 +118,7 @@ class EndpointSelector:
                     url=f"{target_url.rstrip('/')}{path}",
                     method="GET",
                     weight=config.get("weight", default_config["weight"]),
-                    timeout=config.get("timeout", 30),
+                    timeout=config.get("timeout", default_config.get("timeout", 30)),
                     description=config.get("description", default_config["description"]),
                     enabled=config.get("enabled", default_config["enabled"])
                 )
