@@ -34,6 +34,7 @@ class RequestResult:
     error_message: Optional[str] = None
     response_size: int = 0
     timestamp: datetime = None
+    response_headers: Optional[Dict[str, str]] = None
     
     def __post_init__(self):
         if self.timestamp is None:
@@ -194,6 +195,9 @@ class AsyncHTTPClient:
                 # Read response content to get size
                 content = await response.read()
                 result.response_size = len(content)
+                
+                # Store response headers
+                result.response_headers = dict(response.headers)
                 
                 # Determine if request was successful
                 if 200 <= response.status < 400:

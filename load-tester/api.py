@@ -2,7 +2,7 @@
 API endpoints for Load Testing Automation
 """
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
 import logging
 
@@ -36,6 +36,7 @@ class LoadTestStartRequest(BaseModel):
     max_errors_per_minute: int = 100
     enable_logging: bool = True
     timeout: int = 30
+    enable_user_login: bool = False
 
 @router.get("/config")
 async def get_config():
@@ -52,6 +53,9 @@ async def update_config(request: ConfigUpdateRequest):
     try:
         success = config_manager.update_config(request.config)
         if success:
+            # Reset user session manager to reload configuration
+            from user_session_manager import reset_user_session_manager
+            reset_user_session_manager()
             return {"message": "Configuration updated successfully"}
         else:
             raise HTTPException(status_code=400, detail="Invalid configuration")
@@ -259,7 +263,8 @@ async def start_load_test(request: LoadTestStartRequest):
             endpoint_weights=request.endpoint_weights,
             max_errors_per_minute=request.max_errors_per_minute,
             enable_logging=request.enable_logging,
-            timeout=request.timeout
+            timeout=request.timeout,
+            enable_user_login=request.enable_user_login
         )
         
         session = await ltm_module.load_test_manager.start_test(config)
@@ -1009,3 +1014,267 @@ async def reset_load_adjustments():
     except Exception as e:
         logger.error(f"Error resetting load adjustments: {e}")
         raise HTTPException(status_code=500, detail="Failed to reset load adjustments")
+
+# User Session Management API Endpoints
+
+class TestUserRequest(BaseModel):
+    """Request model for test user operations"""
+    user_id: Optional[str] = Field(default=None, description="User ID (auto-generated if not provided)")
+    username: str
+    password: str
+    enabled: bool = True
+    description: str = ""
+
+class TestUsersUpdateRequest(BaseModel):
+    """Request model for updating all test users"""
+    test_users: List[TestUserRequest]
+
+@router.get("/users")
+async def get_test_users():
+    """Get all test users configuration"""
+    try:
+        from config import config_manager
+        from user_session_manager import TestUser
+        
+        # Read directly from config to bypass any caching issues
+        config = config_manager.get_config()
+        users_config = config.get("test_users", [])
+        
+        print(f"DEBUG API: Raw config users: {users_config}")
+        
+        users = []
+        for user_data in users_config:
+            user = TestUser.from_dict(user_data)
+            users.append(user)
+            print(f"DEBUG API: Created user: {user.to_dict()}")
+        
+        result = {
+            "test_users": [user.to_dict() for user in users],
+            "total_count": len(users)
+        }
+        
+        print(f"DEBUG API: Returning: {result}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error getting test users: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get test users")
+
+@router.post("/users")
+async def add_test_user(request: TestUserRequest):
+    """Add a new test user"""
+    try:
+        from user_session_manager import get_user_session_manager, TestUser
+        import uuid
+        manager = get_user_session_manager()
+        
+        # Generate unique user ID if not provided or empty
+        user_id = request.user_id if request.user_id and request.user_id.strip() else f"user_{uuid.uuid4().hex[:8]}"
+        
+        # Check if user_id already exists and generate new one if needed
+        existing_users = manager.get_test_users()
+        existing_ids = {user.user_id for user in existing_users}
+        
+        while user_id in existing_ids:
+            user_id = f"user_{uuid.uuid4().hex[:8]}"
+        
+        user = TestUser(
+            user_id=user_id,
+            username=request.username,
+            password=request.password,
+            enabled=request.enabled,
+            description=request.description
+        )
+        
+        success = manager.add_test_user(user)
+        if success:
+            # Update configuration file
+            users = manager.get_test_users()
+            manager.update_test_users_config(users)
+            return {
+                "message": f"Test user {request.username} added successfully",
+                "user_id": user_id
+            }
+        else:
+            raise HTTPException(status_code=400, detail="User already exists or invalid data")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding test user: {e}")
+        raise HTTPException(status_code=500, detail="Failed to add test user")
+
+@router.put("/users")
+async def update_test_users(request: TestUsersUpdateRequest):
+    """Update all test users configuration"""
+    try:
+        from user_session_manager import get_user_session_manager, TestUser
+        manager = get_user_session_manager()
+        
+        # Convert request to TestUser objects
+        users = []
+        for user_req in request.test_users:
+            user = TestUser(
+                user_id=user_req.user_id,
+                username=user_req.username,
+                password=user_req.password,
+                enabled=user_req.enabled,
+                description=user_req.description
+            )
+            users.append(user)
+        
+        # Update configuration
+        success = manager.update_test_users_config(users)
+        if success:
+            return {"message": f"Updated {len(users)} test users successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to save test users configuration")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating test users: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update test users")
+
+@router.delete("/users/{user_id}")
+async def remove_test_user(user_id: str):
+    """Remove a test user"""
+    try:
+        from user_session_manager import get_user_session_manager
+        manager = get_user_session_manager()
+        
+        success = manager.remove_test_user(user_id)
+        if success:
+            # Update configuration file
+            users = manager.get_test_users()
+            manager.update_test_users_config(users)
+            return {"message": f"Test user {user_id} removed successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="User not found")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error removing test user: {e}")
+        raise HTTPException(status_code=500, detail="Failed to remove test user")
+
+@router.get("/users/sessions")
+async def get_user_sessions():
+    """Get current user session status"""
+    try:
+        from user_session_manager import get_user_session_manager
+        manager = get_user_session_manager()
+        
+        stats = manager.get_session_stats()
+        active_sessions = manager.get_active_sessions()
+        
+        return {
+            "session_stats": stats.to_dict(),
+            "active_sessions": [session.to_dict() for session in active_sessions],
+            "active_count": len(active_sessions)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting user sessions: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get user sessions")
+
+@router.get("/test-simple")
+async def test_simple():
+    """Simple test endpoint"""
+    print("DEBUG: Simple test endpoint called")
+    return {"message": "Simple test working"}
+
+@router.post("/users/sessions/login")
+async def login_all_users():
+    """Login all enabled test users"""
+    print("DEBUG: Login endpoint called")  # Use print for debugging
+    logger.info("API: Login endpoint called")
+    try:
+        from user_session_manager import get_user_session_manager
+        manager = get_user_session_manager()
+        
+        print(f"DEBUG: Manager has {len(manager.test_users)} users")
+        print(f"DEBUG: Manager instance: {id(manager)}")
+        
+        logger.info(f"API: Starting login for {len(manager.test_users)} users")
+        sessions = await manager.login_all_users()
+        logger.info(f"API: Login completed with {len(sessions)} sessions")
+        
+        return {
+            "message": f"Logged in {len(sessions)} users successfully",
+            "sessions": {user_id: session.to_dict() for user_id, session in sessions.items()},
+            "successful_logins": len(sessions)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error logging in users: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail="Failed to login users")
+
+@router.post("/users/sessions/refresh")
+async def refresh_expired_sessions():
+    """Refresh expired user sessions"""
+    try:
+        from user_session_manager import get_user_session_manager
+        manager = get_user_session_manager()
+        
+        refreshed_count = await manager.refresh_expired_sessions()
+        
+        return {
+            "message": f"Refreshed {refreshed_count} expired sessions",
+            "refreshed_count": refreshed_count
+        }
+        
+    except Exception as e:
+        logger.error(f"Error refreshing sessions: {e}")
+        raise HTTPException(status_code=500, detail="Failed to refresh sessions")
+
+@router.post("/users/sessions/logout")
+async def logout_all_users():
+    """Logout all users and clear sessions"""
+    try:
+        from user_session_manager import get_user_session_manager
+        manager = get_user_session_manager()
+        
+        logout_count = await manager.logout_all_users()
+        
+        return {
+            "message": f"Logged out {logout_count} users successfully",
+            "logout_count": logout_count
+        }
+        
+    except Exception as e:
+        logger.error(f"Error logging out users: {e}")
+        raise HTTPException(status_code=500, detail="Failed to logout users")
+
+@router.get("/users/sessions/random")
+async def get_random_session():
+    """Get a random active user session for testing"""
+    try:
+        from user_session_manager import get_user_session_manager
+        manager = get_user_session_manager()
+        
+        session = manager.get_random_session()
+        if session:
+            return {"session": session.to_dict()}
+        else:
+            raise HTTPException(status_code=404, detail="No active sessions available")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting random session: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get random session")
+
+@router.post("/users/sessions/reset")
+async def reset_session_manager():
+    """Reset user session manager to reload configuration"""
+    try:
+        from user_session_manager import reset_user_session_manager
+        reset_user_session_manager()
+        return {"message": "User session manager reset successfully"}
+        
+    except Exception as e:
+        logger.error(f"Error resetting session manager: {e}")
+        raise HTTPException(status_code=500, detail="Failed to reset session manager")

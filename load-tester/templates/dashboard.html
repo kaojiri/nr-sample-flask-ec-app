@@ -363,6 +363,11 @@
                             <i class="fas fa-clock me-2"></i>Scheduled Tests
                         </button>
                     </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab">
+                            <i class="fas fa-users me-2"></i>User Management
+                        </button>
+                    </li>
                 </ul>
             </div>
         </div>
@@ -397,6 +402,50 @@
                             <div class="card-body">
                                 <div id="schedules-list">
                                     <p class="text-muted">Loading schedules...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- User Management Tab -->
+                    <div class="tab-pane fade" id="users" role="tabpanel">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h5 class="card-title mb-0"><i class="fas fa-users me-2"></i>Test Users</h5>
+                                        <button class="btn btn-primary" onclick="showAddUserModal()">
+                                            <i class="fas fa-plus me-2"></i>Add User
+                                        </button>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="test-users-list">
+                                            <p class="text-muted">Loading test users...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="card-title mb-0"><i class="fas fa-key me-2"></i>User Sessions</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="user-sessions-info">
+                                            <p class="text-muted">Loading session information...</p>
+                                        </div>
+                                        <div class="mt-3">
+                                            <button class="btn btn-success w-100 mb-2" onclick="loginAllUsers()">
+                                                <i class="fas fa-sign-in-alt me-2"></i>Login All Users
+                                            </button>
+                                            <button class="btn btn-info w-100 mb-2" onclick="refreshSessions()">
+                                                <i class="fas fa-sync-alt me-2"></i>Refresh Sessions
+                                            </button>
+                                            <button class="btn btn-warning w-100" onclick="logoutAllUsers()">
+                                                <i class="fas fa-sign-out-alt me-2"></i>Logout All Users
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -467,6 +516,14 @@
                                 <input class="form-check-input" type="checkbox" id="enable-logging" checked>
                                 <label class="form-check-label" for="enable-logging">
                                     Enable detailed logging
+                                </label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="enable-user-login">
+                                <label class="form-check-label" for="enable-user-login">
+                                    Enable multiple user login (for New Relic user analysis)
                                 </label>
                             </div>
                         </div>
@@ -645,6 +702,56 @@
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     <button type="button" class="btn btn-info" onclick="refreshEndpointStats()">
                         <i class="fas fa-sync-alt me-2"></i>Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div class="modal fade" id="addUserModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-user-plus me-2"></i>Add Test User</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="add-user-form">
+                        <div class="mb-3">
+                            <label for="user-id" class="form-label">User ID (Optional)</label>
+                            <input type="text" class="form-control" id="user-id" placeholder="Leave empty for auto-generation">
+                            <div class="form-text">Unique identifier for this test user. Leave empty to auto-generate.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username/Email</label>
+                            <input type="email" class="form-control" id="username" required>
+                            <div class="form-text">Login username or email address</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="password" required>
+                            <div class="form-text">Login password</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description (optional)</label>
+                            <input type="text" class="form-control" id="description">
+                            <div class="form-text">Optional description for this test user</div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="user-enabled" checked>
+                                <label class="form-check-label" for="user-enabled">
+                                    Enable this user for load testing
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="addTestUser()">
+                        <i class="fas fa-save me-2"></i>Add User
                     </button>
                 </div>
             </div>
@@ -904,6 +1011,7 @@
                     max_errors_per_minute: parseInt(document.getElementById('max-errors').value),
                     enable_logging: document.getElementById('enable-logging').checked,
                     timeout: parseInt(document.getElementById('timeout').value),
+                    enable_user_login: document.getElementById('enable-user-login').checked,
                     endpoint_weights: {}
                 };
                 
@@ -2251,13 +2359,302 @@
             }
         }
 
-        // Initialize scheduling on page load
+        // User Management Functions
+        async function loadTestUsers() {
+            try {
+                const response = await fetch('/api/users');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayTestUsers(data.test_users);
+                } else {
+                    document.getElementById('test-users-list').innerHTML = '<p class="text-danger">Failed to load test users</p>';
+                }
+                
+            } catch (error) {
+                console.error('Error loading test users:', error);
+                document.getElementById('test-users-list').innerHTML = '<p class="text-danger">Error loading test users</p>';
+            }
+        }
+
+        function displayTestUsers(users) {
+            const container = document.getElementById('test-users-list');
+            
+            if (!users || users.length === 0) {
+                container.innerHTML = '<p class="text-muted">No test users configured</p>';
+                return;
+            }
+            
+            let html = '';
+            users.forEach(user => {
+                const statusBadge = user.enabled ? 
+                    '<span class="badge bg-success">Enabled</span>' : 
+                    '<span class="badge bg-secondary">Disabled</span>';
+                
+                html += `
+                    <div class="border rounded p-3 mb-3">
+                        <div class="row align-items-center">
+                            <div class="col-md-3">
+                                <strong>${user.username}</strong><br>
+                                <small class="text-muted">${user.user_id}</small>
+                            </div>
+                            <div class="col-md-3">
+                                ${statusBadge}
+                            </div>
+                            <div class="col-md-4">
+                                <small class="text-muted">${user.description || 'No description'}</small>
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-sm btn-outline-danger" onclick="removeTestUser('${user.user_id}')">
+                                    <i class="fas fa-trash"></i> Remove
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        async function loadUserSessions() {
+            try {
+                const response = await fetch('/api/users/sessions');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayUserSessions(data);
+                } else {
+                    document.getElementById('user-sessions-info').innerHTML = '<p class="text-danger">Failed to load session info</p>';
+                }
+                
+            } catch (error) {
+                console.error('Error loading user sessions:', error);
+                document.getElementById('user-sessions-info').innerHTML = '<p class="text-danger">Error loading session info</p>';
+            }
+        }
+
+        function displayUserSessions(data) {
+            const container = document.getElementById('user-sessions-info');
+            const stats = data.session_stats;
+            const activeSessions = data.active_sessions;
+            
+            let html = `
+                <div class="mb-3">
+                    <h6>Session Statistics</h6>
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="bg-primary text-white p-2 rounded">
+                                <div class="h5 mb-0">${stats.total_users}</div>
+                                <small>Total Users</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="bg-success text-white p-2 rounded">
+                                <div class="h5 mb-0">${stats.active_sessions}</div>
+                                <small>Active Sessions</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row text-center mt-2">
+                        <div class="col-6">
+                            <div class="bg-warning text-white p-2 rounded">
+                                <div class="h5 mb-0">${stats.expired_sessions}</div>
+                                <small>Expired</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="bg-danger text-white p-2 rounded">
+                                <div class="h5 mb-0">${stats.failed_logins}</div>
+                                <small>Failed Logins</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            if (activeSessions && activeSessions.length > 0) {
+                html += '<div class="mb-3"><h6>Active Sessions</h6>';
+                activeSessions.forEach(session => {
+                    const ageMinutes = Math.round((new Date() - new Date(session.login_time)) / 60000);
+                    html += `
+                        <div class="small border-bottom py-1">
+                            <strong>${session.username}</strong><br>
+                            <span class="text-muted">Age: ${ageMinutes}m</span>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+            
+            container.innerHTML = html;
+        }
+
+        function showAddUserModal() {
+            // Clear form
+            document.getElementById('add-user-form').reset();
+            document.getElementById('user-enabled').checked = true;
+            
+            const modal = new bootstrap.Modal(document.getElementById('addUserModal'));
+            modal.show();
+        }
+
+        async function addTestUser() {
+            try {
+                const formData = {
+                    user_id: document.getElementById('user-id').value.trim(),
+                    username: document.getElementById('username').value,
+                    password: document.getElementById('password').value,
+                    description: document.getElementById('description').value,
+                    enabled: document.getElementById('user-enabled').checked
+                };
+                
+                // Basic validation (user_id is now optional)
+                if (!formData.username || !formData.password) {
+                    showAlert('Please fill in username and password', 'danger');
+                    return;
+                }
+                
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    const message = result.user_id ? 
+                        `Test user added successfully! Generated User ID: ${result.user_id}` :
+                        'Test user added successfully!';
+                    showAlert(message, 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
+                    loadTestUsers();
+                } else {
+                    showAlert(result.detail || 'Failed to add test user', 'danger');
+                }
+                
+            } catch (error) {
+                console.error('Error adding test user:', error);
+                showAlert('Error adding test user', 'danger');
+            }
+        }
+
+        async function removeTestUser(userId) {
+            if (!confirm('Are you sure you want to remove this test user? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/users/${userId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert('Test user removed successfully!', 'success');
+                    loadTestUsers();
+                    loadUserSessions(); // Refresh session info
+                } else {
+                    showAlert(result.detail || 'Failed to remove test user', 'danger');
+                }
+                
+            } catch (error) {
+                console.error('Error removing test user:', error);
+                showAlert('Error removing test user', 'danger');
+            }
+        }
+
+        async function loginAllUsers() {
+            try {
+                showAlert('Logging in all users...', 'info');
+                
+                const response = await fetch('/api/users/sessions/login', {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert(`Successfully logged in ${result.successful_logins} users!`, 'success');
+                    loadUserSessions();
+                } else {
+                    showAlert(result.detail || 'Failed to login users', 'danger');
+                }
+                
+            } catch (error) {
+                console.error('Error logging in users:', error);
+                showAlert('Error logging in users', 'danger');
+            }
+        }
+
+        async function refreshSessions() {
+            try {
+                showAlert('Refreshing expired sessions...', 'info');
+                
+                const response = await fetch('/api/users/sessions/refresh', {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert(`Refreshed ${result.refreshed_count} expired sessions!`, 'success');
+                    loadUserSessions();
+                } else {
+                    showAlert(result.detail || 'Failed to refresh sessions', 'danger');
+                }
+                
+            } catch (error) {
+                console.error('Error refreshing sessions:', error);
+                showAlert('Error refreshing sessions', 'danger');
+            }
+        }
+
+        async function logoutAllUsers() {
+            if (!confirm('Are you sure you want to logout all users? This will clear all active sessions.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/users/sessions/logout', {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert(`Logged out ${result.logout_count} users!`, 'success');
+                    loadUserSessions();
+                } else {
+                    showAlert(result.detail || 'Failed to logout users', 'danger');
+                }
+                
+            } catch (error) {
+                console.error('Error logging out users:', error);
+                showAlert('Error logging out users', 'danger');
+            }
+        }
+
+        // Initialize scheduling and user management on page load
         document.addEventListener('DOMContentLoaded', function() {
             // Add scheduling tab functionality
             const schedulingTab = document.querySelector('[data-bs-target="#scheduling"]');
             if (schedulingTab) {
                 schedulingTab.addEventListener('shown.bs.tab', function() {
                     loadSchedules();
+                });
+            }
+            
+            // Add user management tab functionality
+            const usersTab = document.querySelector('[data-bs-target="#users"]');
+            if (usersTab) {
+                usersTab.addEventListener('shown.bs.tab', function() {
+                    loadTestUsers();
+                    loadUserSessions();
                 });
             }
         });

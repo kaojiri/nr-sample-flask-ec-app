@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 import logging
+import time
 from pathlib import Path
 
 from config import settings
@@ -26,6 +27,18 @@ app = FastAPI(
     description="Automated load testing for Flask EC application",
     version="1.0.0"
 )
+
+# Add middleware to log all requests
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    print(f"MIDDLEWARE: {request.method} {request.url}")  # Use print for debugging
+    logger.info(f"Request: {request.method} {request.url}")
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    print(f"MIDDLEWARE: Response {response.status_code} - {process_time:.3f}s")  # Use print for debugging
+    logger.info(f"Response: {response.status_code} - {process_time:.3f}s")
+    return response
 
 # Create necessary directories
 Path("logs").mkdir(exist_ok=True)

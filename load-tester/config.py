@@ -3,7 +3,7 @@ Configuration management for Load Testing Automation
 """
 from pydantic import Field
 from pydantic_settings import BaseSettings
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 import json
 from pathlib import Path
 
@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     
     # Logging settings
     log_level: str = Field(
-        default="INFO",
+        default="DEBUG",
         description="Logging level (DEBUG, INFO, WARNING, ERROR)"
     )
     
@@ -99,7 +99,8 @@ class ConfigManager:
                 "request_interval_min": settings.default_request_interval_min,
                 "request_interval_max": settings.default_request_interval_max,
                 "max_errors_per_minute": 100,
-                "enable_logging": True
+                "enable_logging": True,
+                "enable_user_login": False
             },
             "endpoints": {
                 "/performance/slow": {"weight": 1.0, "enabled": True},
@@ -111,6 +112,29 @@ class ConfigManager:
                 "/performance/slow-query/full-scan": {"weight": 1.0, "enabled": True, "timeout": 60},
                 "/performance/slow-query/complex-join": {"weight": 1.0, "enabled": True, "timeout": 60}
             },
+            "test_users": [
+                {
+                    "user_id": "test_user_1",
+                    "username": "testuser1@example.com",
+                    "password": "password123",
+                    "enabled": True,
+                    "description": "Default test user 1"
+                },
+                {
+                    "user_id": "test_user_2",
+                    "username": "testuser2@example.com", 
+                    "password": "password123",
+                    "enabled": True,
+                    "description": "Default test user 2"
+                },
+                {
+                    "user_id": "test_user_3",
+                    "username": "testuser3@example.com",
+                    "password": "password123",
+                    "enabled": True,
+                    "description": "Default test user 3"
+                }
+            ],
             "safety": {
                 "max_concurrent_users": settings.max_concurrent_users,
                 "max_duration_minutes": settings.max_duration_minutes,
@@ -176,6 +200,20 @@ class ConfigManager:
     def get_safety_config(self) -> Dict:
         """Get safety configuration"""
         return self.config.get("safety", {})
+    
+    def get_test_users_config(self) -> List[Dict]:
+        """Get test users configuration"""
+        return self.config.get("test_users", [])
+    
+    def update_test_users_config(self, test_users: List[Dict]) -> bool:
+        """Update test users configuration"""
+        try:
+            self.config["test_users"] = test_users
+            self.save_config()
+            return True
+        except Exception as e:
+            print(f"Error updating test users config: {e}")
+            return False
 
 # Global settings instance
 settings = Settings()

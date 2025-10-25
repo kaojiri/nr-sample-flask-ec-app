@@ -119,6 +119,18 @@ class EndpointSelector:
     def get_endpoint_stats(self) -> Dict[str, EndpointStats]
 ```
 
+### 4. User Session Manager
+
+```python
+class UserSessionManager:
+    def __init__(self, test_users: List[TestUser])
+    def login_all_users(self) -> Dict[str, UserSession]
+    def get_random_session(self) -> UserSession
+    def refresh_expired_sessions(self) -> None
+    def get_session_stats(self) -> Dict[str, SessionStats]
+    def logout_all_users(self) -> None
+```
+
 ### 4. 追加パフォーマンステストエンドポイント
 
 新しい要件に基づき、以下の追加エンドポイントが負荷テスト対象に含まれます：
@@ -140,6 +152,39 @@ class EndpointSelector:
 
 これらのエンドポイントは既存のエンドポイント選択ロジックに統合され、重み付きランダム選択の対象となります。
 
+### 5. 複数ユーザーログイン機能
+
+#### 5.1 ユーザーセッション管理
+- **目的**: 複数のテストユーザーでログインし、ユーザー毎のセッションを管理
+- **機能**:
+  - テストユーザーアカウントの設定管理
+  - ログインAPIを使用したセッション取得
+  - セッションCookieの管理と維持
+  - セッション期限切れ時の自動再ログイン
+
+#### 5.2 ユーザー認証フロー
+```mermaid
+sequenceDiagram
+    participant LT as Load Tester
+    participant APP as Target App
+    participant NR as New Relic
+    
+    LT->>APP: POST /login (user1 credentials)
+    APP->>LT: Session Cookie
+    LT->>APP: GET /performance/slow (with session)
+    APP->>NR: Custom Attribute: user_id=user1
+    
+    LT->>APP: POST /login (user2 credentials)
+    APP->>LT: Session Cookie
+    LT->>APP: GET /performance/n-plus-one (with session)
+    APP->>NR: Custom Attribute: user_id=user2
+```
+
+#### 5.3 New Relic Custom Attribute連携
+- **既存実装活用**: アプリケーション側で既に実装されているCustom Attribute（`userId`、`enduser.id`）を活用
+- **セッション管理**: 各ユーザーセッションの独立した管理のみ実装
+- **分析支援**: ログインしたユーザーでリクエストを送信することで、New RelicでユーザーID毎のパフォーマンス分析が自動的に可能
+
 
 
 ## データモデル
@@ -157,6 +202,8 @@ class LoadTestConfig:
     endpoint_weights: Dict[str, float] = field(default_factory=dict)
     max_errors_per_minute: int = 100
     enable_logging: bool = True
+    test_users: List[TestUser] = field(default_factory=list)
+    enable_user_login: bool = False
 ```
 
 ### 2. Test Session
@@ -182,6 +229,26 @@ class EndpointConfig:
     weight: float = 1.0
     timeout: int = 30
     description: str = ""
+```
+
+### 4. Test User Configuration
+
+```python
+@dataclass
+class TestUser:
+    user_id: str
+    username: str
+    password: str
+    enabled: bool = True
+    description: str = ""
+
+@dataclass
+class UserSession:
+    user_id: str
+    session_cookie: str
+    login_time: datetime
+    last_used: datetime
+    is_valid: bool = True
 ```
 
 ## エラーハンドリング

@@ -41,6 +41,7 @@ class LoadTestConfig:
     max_errors_per_minute: int = 100
     enable_logging: bool = True
     timeout: int = 30
+    enable_user_login: bool = False
     
     def __post_init__(self):
         if self.endpoint_weights is None:
@@ -53,7 +54,8 @@ class LoadTestConfig:
             request_interval_max=self.request_interval_max,
             max_errors_per_minute=self.max_errors_per_minute,
             timeout=self.timeout,
-            enable_logging=self.enable_logging
+            enable_logging=self.enable_logging,
+            enable_user_login=self.enable_user_login
         )
     
     def validate(self) -> List[str]:
@@ -361,6 +363,10 @@ class LoadTestManager:
             if config.endpoint_weights:
                 from endpoint_selector import endpoint_selector
                 endpoint_selector.update_weights(config.endpoint_weights)
+            
+            # Initialize user sessions if user login is enabled
+            if config.enable_user_login:
+                await self._initialize_user_sessions()
             
             # Create statistics collector for this session
             self._statistics_collector = statistics_manager.create_collector(session_id)
@@ -839,6 +845,31 @@ class LoadTestManager:
                         
         except Exception as e:
             logger.error(f"Error handling resource alert: {e}")
+    
+    async def _initialize_user_sessions(self):
+        """Initialize user sessions for load testing"""
+        try:
+            from user_session_manager import get_user_session_manager
+            manager = get_user_session_manager()
+            
+            logger.info("Initializing user sessions for load testing")
+            
+            # Login all enabled users
+            sessions = await manager.login_all_users()
+            
+            if not sessions:
+                logger.warning("No user sessions available - load test will run without authentication")
+                return
+            
+            logger.info(f"Successfully initialized {len(sessions)} user sessions")
+            
+            # Optionally refresh expired sessions periodically during the test
+            # This could be implemented as a background task if needed
+            
+        except Exception as e:
+            logger.error(f"Error initializing user sessions: {e}")
+            # Don't fail the load test if user sessions can't be initialized
+            # The test will continue without authentication
     
     def get_error_stats(self) -> Dict[str, Any]:
         """Get current error statistics"""

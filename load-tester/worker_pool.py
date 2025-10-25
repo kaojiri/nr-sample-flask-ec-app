@@ -43,6 +43,7 @@ class WorkerConfig:
     max_errors_per_minute: int = 100
     timeout: int = 30
     enable_logging: bool = True
+    enable_user_login: bool = False
 
 @dataclass
 class WorkerStats:
@@ -207,11 +208,24 @@ class LoadTestWorker:
                 self._stop_event.set()
                 return
             
+            # Prepare request headers
+            headers = {}
+            
+            # Add user session cookie if user login is enabled
+            if self.config.enable_user_login:
+                session = self._get_random_user_session()
+                if session:
+                    headers['Cookie'] = f"session={session.session_cookie}"
+                    logger.debug(f"Worker {self.worker_id}: Using session for user {session.username}")
+                else:
+                    logger.warning(f"Worker {self.worker_id}: No user session available, making request without authentication")
+            
             # Make the request
             result = await self._http_client.make_request(
                 url=endpoint.url,
                 method=endpoint.method,
                 timeout=self.config.timeout,
+                headers=headers,
                 worker_id=self.worker_id
             )
             
@@ -303,6 +317,16 @@ class LoadTestWorker:
     def set_statistics_callback(self, callback: Optional[Callable]):
         """Set callback for recording statistics"""
         self._statistics_callback = callback
+    
+    def _get_random_user_session(self):
+        """Get a random user session for authenticated requests"""
+        try:
+            from user_session_manager import get_user_session_manager
+            manager = get_user_session_manager()
+            return manager.get_random_session()
+        except Exception as e:
+            logger.error(f"Error getting user session: {e}")
+            return None
 
 class WorkerPool:
     """
