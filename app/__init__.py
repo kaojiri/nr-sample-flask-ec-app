@@ -13,7 +13,7 @@ def create_app():
 
     # Configuration
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://user:password@localhost/ecdb')
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///instance/test.db')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     # Setup logging
@@ -49,11 +49,14 @@ def create_app():
             app.logger.debug(f'Failed to set New Relic custom attributes: {e}')
 
     # Register blueprints
-    from app.routes import main, auth, products, cart, performance_issues
+    from app.routes import main, auth, products, cart, performance_issues, bulk_users, error_reports
     app.register_blueprint(main.bp)
     app.register_blueprint(auth.bp)
     app.register_blueprint(products.bp)
     app.register_blueprint(cart.bp)
     app.register_blueprint(performance_issues.bp)
+    app.register_blueprint(bulk_users.bp)
+    app.register_blueprint(bulk_users.admin_bp)  # 管理画面
+    app.register_blueprint(error_reports.error_reports_bp)
 
     return app

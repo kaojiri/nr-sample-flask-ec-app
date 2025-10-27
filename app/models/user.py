@@ -11,6 +11,14 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Bulk user management fields
+    is_test_user = db.Column(db.Boolean, default=False, nullable=False)
+    test_batch_id = db.Column(db.String(255), nullable=True)
+    created_by_bulk = db.Column(db.Boolean, default=False, nullable=False)
+    
+    # Admin field
+    is_admin = db.Column(db.Boolean, default=False, nullable=False)
 
     # Relationships
     orders = db.relationship('Order', backref='user', lazy=True)

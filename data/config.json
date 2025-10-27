@@ -1,0 +1,78 @@
+{
+  "target_app_url": "http://app:5000",
+  "load_test": {
+    "concurrent_users": 10,
+    "duration_minutes": 30,
+    "request_interval_min": 1.0,
+    "request_interval_max": 5.0,
+    "max_errors_per_minute": 100,
+    "enable_logging": true,
+    "enable_user_login": false
+  },
+  "endpoints": {
+    "/performance/slow": {
+      "weight": 1.0,
+      "enabled": true
+    },
+    "/performance/n-plus-one": {
+      "weight": 1.0,
+      "enabled": true
+    },
+    "/performance/slow-query": {
+      "weight": 1.0,
+      "enabled": true
+    },
+    "/performance/js-errors": {
+      "weight": 1.0,
+      "enabled": true
+    },
+    "/performance/bad-vitals": {
+      "weight": 1.0,
+      "enabled": true
+    },
+    "/performance/error": {
+      "weight": 1.0,
+      "enabled": true,
+      "timeout": 30
+    },
+    "/performance/slow-query/full-scan": {
+      "weight": 1.0,
+      "enabled": true,
+      "timeout": 60
+    },
+    "/performance/slow-query/complex-join": {
+      "weight": 1.0,
+      "enabled": true,
+      "timeout": 60
+    }
+  },
+  "test_users": [
+    {
+      "user_id": "sync_1",
+      "username": "testuser1@example.com",
+      "password": "TestPass123!",
+      "enabled": true,
+      "description": "Synced from Main App (batch: test_batch_001)"
+    },
+    {
+      "user_id": "sync_2",
+      "username": "testuser2@example.com",
+      "password": "TestPass123!",
+      "enabled": true,
+      "description": "Synced from Main App (batch: test_batch_001)"
+    }
+  ],
+  "safety": {
+    "max_concurrent_users": 50,
+    "max_duration_minutes": 120,
+    "emergency_stop_enabled": true
+  },
+  "bulk_user_management": {
+    "sync_enabled": true,
+    "sync_interval_minutes": 30,
+    "auto_login_on_sync": true,
+    "max_bulk_users": 1000,
+    "cleanup_on_shutdown": true,
+    "main_app_url": "http://app:5000"
+  }
+}

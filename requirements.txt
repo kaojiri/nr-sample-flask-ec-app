@@ -8,3 +8,4 @@ gunicorn==21.2.0
 Werkzeug==3.0.1
 boto3==1.34.24
 newrelic>=11.0.0,<12.0.0
+requests==2.31.0

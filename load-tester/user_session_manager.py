@@ -25,6 +25,8 @@ class TestUser:
     password: str
     enabled: bool = True
     description: str = ""
+    test_batch_id: Optional[str] = None
+    is_bulk_created: bool = False
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization"""
@@ -33,7 +35,9 @@ class TestUser:
             "username": self.username,
             "password": self.password,
             "enabled": self.enabled,
-            "description": self.description
+            "description": self.description,
+            "test_batch_id": self.test_batch_id,
+            "is_bulk_created": self.is_bulk_created
         }
     
     @classmethod
@@ -44,7 +48,9 @@ class TestUser:
             username=data["username"],
             password=data["password"],
             enabled=data.get("enabled", True),
-            description=data.get("description", "")
+            description=data.get("description", ""),
+            test_batch_id=data.get("test_batch_id"),
+            is_bulk_created=data.get("is_bulk_created", False)
         )
 
 @dataclass
@@ -116,6 +122,19 @@ class SessionStats:
     successful_logins: int = 0
     last_login_time: Optional[datetime] = None
     
+    @property
+    def success_rate(self) -> float:
+        """Calculate login success rate"""
+        total_attempts = self.successful_logins + self.failed_logins
+        if total_attempts == 0:
+            return 0.0
+        return (self.successful_logins / total_attempts) * 100.0
+    
+    @property
+    def total_sessions(self) -> int:
+        """Total number of sessions (active + expired)"""
+        return self.active_sessions + self.expired_sessions
+    
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
         return {
@@ -124,6 +143,8 @@ class SessionStats:
             "expired_sessions": self.expired_sessions,
             "failed_logins": self.failed_logins,
             "successful_logins": self.successful_logins,
+            "success_rate": self.success_rate,
+            "total_sessions": self.total_sessions,
             "last_login_time": self.last_login_time.isoformat() if self.last_login_time else None
         }
 
@@ -599,6 +620,357 @@ class UserSessionManager:
         except Exception as e:
             logger.error(f"Error updating test users configuration: {e}")
             return False
+    
+    def get_users_by_batch(self, batch_id: str) -> List[TestUser]:
+        """
+        Get users by batch ID
+        
+        Args:
+            batch_id: Batch ID to filter by
+            
+        Returns:
+            List of TestUser objects in the batch
+        """
+        try:
+            batch_users = [
+                user for user in self.test_users.values()
+                if user.test_batch_id == batch_id
+            ]
+            logger.debug(f"Found {len(batch_users)} users in batch {batch_id}")
+            return batch_users
+        except Exception as e:
+            logger.error(f"Error getting users by batch {batch_id}: {e}")
+            return []
+    
+    def get_all_batches(self) -> List[str]:
+        """
+        Get all unique batch IDs
+        
+        Returns:
+            List of unique batch IDs
+        """
+        try:
+            batch_ids = set()
+            for user in self.test_users.values():
+                if user.test_batch_id:
+                    batch_ids.add(user.test_batch_id)
+            return list(batch_ids)
+        except Exception as e:
+            logger.error(f"Error getting all batches: {e}")
+            return []
+    
+    async def login_batch_users(self, batch_id: str) -> Dict[str, UserSession]:
+        """
+        Login all users in a specific batch
+        
+        Args:
+            batch_id: Batch ID to login
+            
+        Returns:
+            Dictionary mapping user_id to UserSession for successful logins
+        """
+        try:
+            batch_users = self.get_users_by_batch(batch_id)
+            enabled_users = [user for user in batch_users if user.enabled]
+            
+            logger.info(f"Logging in {len(enabled_users)} users from batch {batch_id}")
+            
+            login_tasks = []
+            for user in enabled_users:
+                task = asyncio.create_task(self._login_user(user))
+                login_tasks.append(task)
+            
+            # Execute all login attempts concurrently
+            results = await asyncio.gather(*login_tasks, return_exceptions=True)
+            
+            # Process results
+            successful_sessions = {}
+            for i, result in enumerate(results):
+                user = enabled_users[i]
+                
+                if isinstance(result, Exception):
+                    logger.error(f"Login failed for user {user.username}: {result}")
+                    self.stats.failed_logins += 1
+                elif result:
+                    successful_sessions[user.user_id] = result
+                    self.active_sessions[user.user_id] = result
+                    self.stats.successful_logins += 1
+                    self.stats.last_login_time = datetime.now()
+                else:
+                    logger.warning(f"Login returned None for user {user.username}")
+                    self.stats.failed_logins += 1
+            
+            self.stats.active_sessions = len([s for s in self.active_sessions.values() if s.is_valid])
+            logger.info(f"Successfully logged in {len(successful_sessions)} out of {len(enabled_users)} users from batch {batch_id}")
+            
+            return successful_sessions
+            
+        except Exception as e:
+            logger.error(f"Error during batch user login for batch {batch_id}: {e}")
+            return {}
+    
+    def remove_batch_users(self, batch_id: str) -> int:
+        """
+        Remove all users from a specific batch
+        
+        Args:
+            batch_id: Batch ID to remove
+            
+        Returns:
+            Number of users removed
+        """
+        try:
+            batch_users = self.get_users_by_batch(batch_id)
+            removed_count = 0
+            
+            for user in batch_users:
+                if self.remove_test_user(user.user_id):
+                    removed_count += 1
+            
+            logger.info(f"Removed {removed_count} users from batch {batch_id}")
+            return removed_count
+            
+        except Exception as e:
+            logger.error(f"Error removing batch users for batch {batch_id}: {e}")
+            return 0
+    
+    def get_batch_session_stats(self, batch_id: str) -> Dict[str, Any]:
+        """
+        Get session statistics for a specific batch
+        
+        Args:
+            batch_id: Batch ID to get stats for
+            
+        Returns:
+            Dictionary with batch session statistics
+        """
+        try:
+            batch_users = self.get_users_by_batch(batch_id)
+            batch_sessions = [
+                session for session in self.active_sessions.values()
+                if any(user.user_id == session.user_id for user in batch_users)
+            ]
+            
+            active_sessions = [s for s in batch_sessions if s.is_valid and not s.is_expired]
+            expired_sessions = [s for s in batch_sessions if s.is_expired]
+            
+            return {
+                "batch_id": batch_id,
+                "total_users": len(batch_users),
+                "total_sessions": len(batch_sessions),
+                "active_sessions": len(active_sessions),
+                "expired_sessions": len(expired_sessions),
+                "session_details": [
+                    {
+                        "user_id": session.user_id,
+                        "username": session.username,
+                        "is_valid": session.is_valid,
+                        "is_expired": session.is_expired,
+                        "age_minutes": session.age_minutes
+                    }
+                    for session in batch_sessions
+                ]
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting batch session stats for batch {batch_id}: {e}")
+            return {
+                "batch_id": batch_id,
+                "error": str(e)
+            }
+    
+    def remove_user_by_username(self, username: str) -> bool:
+        """
+        ユーザー名でユーザーを削除（ライフサイクル管理用）
+        要件 3.1: バッチ単位でのテストユーザー削除機能
+        
+        Args:
+            username: 削除するユーザー名
+            
+        Returns:
+            True if removed successfully, False otherwise
+        """
+        try:
+            # ユーザー名でユーザーを検索
+            user_to_remove = None
+            for user in self.test_users.values():
+                if user.username == username:
+                    user_to_remove = user
+                    break
+            
+            if user_to_remove:
+                return self.remove_test_user(user_to_remove.user_id)
+            else:
+                logger.warning(f"User with username {username} not found")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error removing user by username {username}: {e}")
+            return False
+    
+    def clear_all_sessions(self) -> int:
+        """
+        全てのセッションをクリア（ライフサイクル管理用）
+        要件 3.1: バッチ単位でのテストユーザー削除機能
+        
+        Returns:
+            Number of sessions cleared
+        """
+        try:
+            cleared_count = len(self.active_sessions)
+            self.active_sessions.clear()
+            
+            # 統計を更新
+            self.stats.active_sessions = 0
+            self.stats.expired_sessions = 0
+            
+            logger.info(f"Cleared {cleared_count} sessions")
+            return cleared_count
+            
+        except Exception as e:
+            logger.error(f"Error clearing all sessions: {e}")
+            return 0
+    
+    def identify_test_users_by_criteria(self, criteria: Dict[str, Any]) -> Dict[str, List[TestUser]]:
+        """
+        条件に基づいてテストユーザーを識別
+        要件 3.2: テストユーザーと本番ユーザーの識別機能
+        
+        Args:
+            criteria: 識別条件（batch_id, is_bulk_created等）
+            
+        Returns:
+            Dictionary with categorized users
+        """
+        try:
+            matching_users = []
+            non_matching_users = []
+            
+            for user in self.test_users.values():
+                matches = True
+                
+                # バッチIDでフィルタ
+                if 'batch_id' in criteria:
+                    if user.test_batch_id != criteria['batch_id']:
+                        matches = False
+                
+                # 一括作成フラグでフィルタ
+                if 'is_bulk_created' in criteria:
+                    if user.is_bulk_created != criteria['is_bulk_created']:
+                        matches = False
+                
+                # 有効フラグでフィルタ
+                if 'enabled' in criteria:
+                    if user.enabled != criteria['enabled']:
+                        matches = False
+                
+                if matches:
+                    matching_users.append(user)
+                else:
+                    non_matching_users.append(user)
+            
+            return {
+                'matching_users': matching_users,
+                'non_matching_users': non_matching_users,
+                'total_matching': len(matching_users),
+                'total_non_matching': len(non_matching_users),
+                'criteria': criteria,
+                'identification_timestamp': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error identifying test users by criteria: {e}")
+            return {
+                'error': str(e),
+                'criteria': criteria,
+                'identification_timestamp': datetime.now().isoformat()
+            }
+    
+    def generate_lifecycle_report(self) -> Dict[str, Any]:
+        """
+        ライフサイクルレポートを生成
+        要件 3.3: クリーンアップレポート生成機能
+        
+        Returns:
+            Dictionary with lifecycle report
+        """
+        try:
+            # 基本統計
+            total_users = len(self.test_users)
+            enabled_users = len([user for user in self.test_users.values() if user.enabled])
+            bulk_created_users = len([user for user in self.test_users.values() if user.is_bulk_created])
+            
+            # バッチ統計
+            batches = self.get_all_batches()
+            batch_details = []
+            
+            for batch_id in batches:
+                batch_users = self.get_users_by_batch(batch_id)
+                batch_stats = self.get_batch_session_stats(batch_id)
+                
+                batch_details.append({
+                    'batch_id': batch_id,
+                    'user_count': len(batch_users),
+                    'enabled_count': len([user for user in batch_users if user.enabled]),
+                    'bulk_created_count': len([user for user in batch_users if user.is_bulk_created]),
+                    'active_sessions': batch_stats.get('active_sessions', 0),
+                    'total_sessions': batch_stats.get('total_sessions', 0)
+                })
+            
+            # セッション統計
+            session_stats = self.get_session_stats()
+            
+            return {
+                'total_users': total_users,
+                'enabled_users': enabled_users,
+                'bulk_created_users': bulk_created_users,
+                'total_batches': len(batches),
+                'batch_details': batch_details,
+                'session_statistics': session_stats.to_dict(),
+                'system': 'load_tester',
+                'report_timestamp': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error generating lifecycle report: {e}")
+            return {
+                'error': str(e),
+                'system': 'load_tester',
+                'report_timestamp': datetime.now().isoformat()
+            }
+    
+    def cleanup_old_sessions(self, max_age_hours: int = 24) -> int:
+        """
+        古いセッションをクリーンアップ
+        
+        Args:
+            max_age_hours: 最大セッション保持時間（時間）
+            
+        Returns:
+            Number of sessions cleaned up
+        """
+        try:
+            cutoff_time = datetime.now() - timedelta(hours=max_age_hours)
+            old_sessions = []
+            
+            for user_id, session in list(self.active_sessions.items()):
+                if session.login_time < cutoff_time:
+                    old_sessions.append(user_id)
+            
+            # 古いセッションを削除
+            for user_id in old_sessions:
+                del self.active_sessions[user_id]
+            
+            # 統計を更新
+            self.stats.active_sessions = len([s for s in self.active_sessions.values() if s.is_valid])
+            self.stats.expired_sessions = len([s for s in self.active_sessions.values() if s.is_expired])
+            
+            logger.info(f"Cleaned up {len(old_sessions)} old sessions (older than {max_age_hours} hours)")
+            return len(old_sessions)
+            
+        except Exception as e:
+            logger.error(f"Error cleaning up old sessions: {e}")
+            return 0
     
     async def close(self):
         """Close HTTP client and cleanup resources"""

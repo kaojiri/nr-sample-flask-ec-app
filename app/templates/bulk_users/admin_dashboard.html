@@ -1,0 +1,422 @@
+{% extends "base.html" %}
+
+{% block title %}一括ユーザー管理 - 管理画面{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">
+                <i class="fas fa-users"></i> 一括ユーザー管理システム
+            </h1>
+            
+            <!-- ナビゲーションタブ -->
+            <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="create-tab" data-bs-toggle="tab" data-bs-target="#create" type="button" role="tab">
+                        <i class="fas fa-plus-circle"></i> ユーザー作成
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="sync-tab" data-bs-toggle="tab" data-bs-target="#sync" type="button" role="tab">
+                        <i class="fas fa-sync"></i> 同期管理
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="lifecycle-tab" data-bs-toggle="tab" data-bs-target="#lifecycle" type="button" role="tab">
+                        <i class="fas fa-trash-alt"></i> ライフサイクル管理
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="config-tab" data-bs-toggle="tab" data-bs-target="#config" type="button" role="tab">
+                        <i class="fas fa-cog"></i> 設定管理
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="stats-tab" data-bs-toggle="tab" data-bs-target="#stats" type="button" role="tab">
+                        <i class="fas fa-chart-bar"></i> 統計情報
+                    </button>
+                </li>
+            </ul>
+
+            <!-- タブコンテンツ -->
+            <div class="tab-content" id="adminTabsContent">
+                
+                <!-- ユーザー作成タブ -->
+                <div class="tab-pane fade show active" id="create" role="tabpanel">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-user-plus"></i> 一括ユーザー作成</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form id="bulkCreateForm">
+                                        <div class="mb-3">
+                                            <label for="userCount" class="form-label">作成ユーザー数</label>
+                                            <input type="number" class="form-control" id="userCount" min="1" max="1000" value="10" required>
+                                            <div class="form-text">最大1000ユーザーまで作成可能</div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="configTemplate" class="form-label">設定テンプレート</label>
+                                            <select class="form-select" id="configTemplate">
+                                                <option value="default">デフォルト</option>
+                                                <option value="admin">管理者</option>
+                                                <option value="custom">カスタム</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div id="customConfigSection" class="mb-3" style="display: none;">
+                                            <label for="usernamePattern" class="form-label">ユーザー名パターン</label>
+                                            <input type="text" class="form-control" id="usernamePattern" value="testuser_{id}@example.com">
+                                            
+                                            <label for="emailDomain" class="form-label mt-2">メールドメイン</label>
+                                            <input type="text" class="form-control" id="emailDomain" value="example.com">
+                                            
+                                            <label for="batchSize" class="form-label mt-2">バッチサイズ</label>
+                                            <input type="number" class="form-control" id="batchSize" min="1" max="100" value="50">
+                                        </div>
+                                        
+                                        <button type="submit" class="btn btn-primary" id="createUsersBtn">
+                                            <i class="fas fa-play"></i> ユーザー作成開始
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-info-circle"></i> 作成結果</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="createResults" class="text-muted">
+                                        ユーザー作成を実行すると結果がここに表示されます
+                                    </div>
+                                    <div id="createProgress" class="mt-3" style="display: none;">
+                                        <div class="progress">
+                                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 同期管理タブ -->
+                <div class="tab-pane fade" id="sync" role="tabpanel">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-exchange-alt"></i> 同期操作</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <button class="btn btn-success w-100 mb-3" id="syncToLoadTesterBtn">
+                                                <i class="fas fa-upload"></i> Load Testerに同期
+                                            </button>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <button class="btn btn-info w-100 mb-3" id="checkSyncStatusBtn">
+                                                <i class="fas fa-search"></i> 同期状況確認
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="syncBatchId" class="form-label">バッチID（省略可）</label>
+                                        <input type="text" class="form-control" id="syncBatchId" placeholder="特定のバッチのみ同期する場合">
+                                    </div>
+                                    
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="testUsersOnly" checked>
+                                        <label class="form-check-label" for="testUsersOnly">
+                                            テストユーザーのみ同期
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-clock"></i> 同期履歴</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="syncHistory" class="text-muted">
+                                        同期履歴がここに表示されます
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-list"></i> 同期結果</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="syncResults" class="text-muted">
+                                        同期操作を実行すると結果がここに表示されます
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ライフサイクル管理タブ -->
+                <div class="tab-pane fade" id="lifecycle" role="tabpanel">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-broom"></i> クリーンアップ操作</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="cleanupBatchId" class="form-label">削除対象バッチID</label>
+                                        <select class="form-select" id="cleanupBatchId">
+                                            <option value="">バッチを選択してください</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="syncCleanup" checked>
+                                        <label class="form-check-label" for="syncCleanup">
+                                            Load Testerからも同時削除
+                                        </label>
+                                    </div>
+                                    
+                                    <button class="btn btn-danger" id="cleanupBtn">
+                                        <i class="fas fa-trash"></i> クリーンアップ実行
+                                    </button>
+                                    
+                                    <button class="btn btn-warning ms-2" id="getCleanupCandidatesBtn">
+                                        <i class="fas fa-search"></i> 候補を検索
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-shield-alt"></i> 保護機能</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle"></i>
+                                        <strong>安全機能:</strong>
+                                        <ul class="mb-0 mt-2">
+                                            <li>非テストユーザーの削除を自動防止</li>
+                                            <li>バッチ単位での安全な削除</li>
+                                            <li>削除前の確認とレポート生成</li>
+                                        </ul>
+                                    </div>
+                                    
+                                    <button class="btn btn-outline-primary" id="identifyUsersBtn">
+                                        <i class="fas fa-user-check"></i> ユーザー識別
+                                    </button>
+                                    
+                                    <button class="btn btn-outline-info ms-2" id="generateReportBtn">
+                                        <i class="fas fa-file-alt"></i> レポート生成
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-clipboard-list"></i> クリーンアップ結果</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="cleanupResults" class="text-muted">
+                                        クリーンアップ操作を実行すると結果がここに表示されます
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 設定管理タブ -->
+                <div class="tab-pane fade" id="config" role="tabpanel">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-template"></i> 設定テンプレート</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="templateList" class="form-label">利用可能なテンプレート</label>
+                                        <select class="form-select" id="templateList">
+                                            <option value="">テンプレートを選択</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="btn-group w-100 mb-3" role="group">
+                                        <button class="btn btn-outline-primary" id="loadTemplateBtn">
+                                            <i class="fas fa-download"></i> 読み込み
+                                        </button>
+                                        <button class="btn btn-outline-success" id="saveTemplateBtn">
+                                            <i class="fas fa-save"></i> 保存
+                                        </button>
+                                        <button class="btn btn-outline-danger" id="deleteTemplateBtn">
+                                            <i class="fas fa-trash"></i> 削除
+                                        </button>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="newTemplateName" class="form-label">新規テンプレート名</label>
+                                        <input type="text" class="form-control" id="newTemplateName" placeholder="カスタムテンプレート名">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-edit"></i> 設定エディタ</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="configEditor" class="form-label">設定JSON</label>
+                                        <textarea class="form-control" id="configEditor" rows="10" placeholder="設定をJSON形式で入力"></textarea>
+                                    </div>
+                                    
+                                    <button class="btn btn-primary" id="validateConfigBtn">
+                                        <i class="fas fa-check"></i> 設定検証
+                                    </button>
+                                    
+                                    <div id="configValidation" class="mt-3"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 統計情報タブ -->
+                <div class="tab-pane fade" id="stats" role="tabpanel">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title text-primary">
+                                        <i class="fas fa-users"></i>
+                                    </h5>
+                                    <h2 id="totalTestUsers" class="text-primary">-</h2>
+                                    <p class="card-text">総テストユーザー数</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title text-success">
+                                        <i class="fas fa-layer-group"></i>
+                                    </h5>
+                                    <h2 id="totalBatches" class="text-success">-</h2>
+                                    <p class="card-text">アクティブバッチ数</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title text-info">
+                                        <i class="fas fa-sync"></i>
+                                    </h5>
+                                    <h2 id="syncStatus" class="text-info">-</h2>
+                                    <p class="card-text">同期状況</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title text-warning">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                    </h5>
+                                    <h2 id="cleanupCandidates" class="text-warning">-</h2>
+                                    <p class="card-text">クリーンアップ候補</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-table"></i> バッチ一覧</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped" id="batchesTable">
+                                            <thead>
+                                                <tr>
+                                                    <th>バッチID</th>
+                                                    <th>ユーザー数</th>
+                                                    <th>作成日時</th>
+                                                    <th>操作</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td colspan="4" class="text-center text-muted">データを読み込み中...</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- モーダル: 確認ダイアログ -->
+<div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">確認</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmMessage">この操作を実行しますか？</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" id="confirmAction">実行</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<script src="{{ url_for('static', filename='js/bulk_users_admin.js') }}"></script>
+
+{% endblock %}

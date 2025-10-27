@@ -1,0 +1,740 @@
+{% extends "base.html" %}
+
+{% block title %}同期ダッシュボード - 一括ユーザー管理{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">
+                <i class="fas fa-sync"></i> 同期ダッシュボード
+                <button class="btn btn-outline-primary btn-sm ms-3" id="refreshBtn">
+                    <i class="fas fa-refresh"></i> 更新
+                </button>
+            </h1>
+            
+            <!-- 同期状況サマリー -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title text-success">
+                                <i class="fas fa-check-circle"></i>
+                            </h5>
+                            <h2 id="syncStatus" class="text-success">-</h2>
+                            <p class="card-text">同期状況</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title text-info">
+                                <i class="fas fa-users"></i>
+                            </h5>
+                            <h2 id="totalSyncedUsers" class="text-info">-</h2>
+                            <p class="card-text">同期済みユーザー数</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title text-warning">
+                                <i class="fas fa-clock"></i>
+                            </h5>
+                            <h2 id="lastSyncTime" class="text-warning">-</h2>
+                            <p class="card-text">最終同期時刻</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title text-danger">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </h5>
+                            <h2 id="syncErrors" class="text-danger">-</h2>
+                            <p class="card-text">同期エラー数</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 同期操作パネル -->
+            <div class="row mb-4">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-play"></i> 同期操作</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="syncBatchFilter" class="form-label">バッチフィルター</label>
+                                        <select class="form-select" id="syncBatchFilter">
+                                            <option value="">全バッチ</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="testUsersOnlySync" checked>
+                                        <label class="form-check-label" for="testUsersOnlySync">
+                                            テストユーザーのみ
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="syncTarget" class="form-label">同期先</label>
+                                        <select class="form-select" id="syncTarget">
+                                            <option value="load_tester">Load Tester</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="forceSyncCheck">
+                                        <label class="form-check-label" for="forceSyncCheck">
+                                            強制同期
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="btn-group w-100" role="group">
+                                <button class="btn btn-primary" id="startSyncBtn">
+                                    <i class="fas fa-play"></i> 同期開始
+                                </button>
+                                <button class="btn btn-info" id="checkSyncBtn">
+                                    <i class="fas fa-search"></i> 状況確認
+                                </button>
+                                <button class="btn btn-warning" id="validateSyncBtn">
+                                    <i class="fas fa-check"></i> 整合性検証
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-cog"></i> 自動同期設定</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="autoSyncEnabled">
+                                <label class="form-check-label" for="autoSyncEnabled">
+                                    自動同期有効
+                                </label>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="syncInterval" class="form-label">同期間隔（分）</label>
+                                <input type="number" class="form-control" id="syncInterval" value="30" min="5" max="1440">
+                            </div>
+                            
+                            <button class="btn btn-outline-primary w-100" id="updateAutoSyncBtn">
+                                <i class="fas fa-save"></i> 設定更新
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 同期履歴とログ -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-history"></i> 同期履歴</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                <table class="table table-sm table-striped">
+                                    <thead class="sticky-top bg-light">
+                                        <tr>
+                                            <th>時刻</th>
+                                            <th>対象</th>
+                                            <th>件数</th>
+                                            <th>状況</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="syncHistoryTable">
+                                        <tr>
+                                            <td colspan="4" class="text-center text-muted">履歴を読み込み中...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-list"></i> リアルタイムログ</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="syncLogs" class="bg-dark text-light p-3 rounded" style="height: 400px; overflow-y: auto; font-family: monospace; font-size: 0.85em;">
+                                <div class="text-muted">ログを読み込み中...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 同期結果詳細 -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-chart-line"></i> 同期結果詳細</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="syncResults" class="text-muted">
+                                同期操作を実行すると結果がここに表示されます
+                            </div>
+                            
+                            <!-- 進行状況バー -->
+                            <div id="syncProgress" class="mt-3" style="display: none;">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span>同期進行状況</span>
+                                    <span id="syncProgressText">0%</span>
+                                </div>
+                                <div class="progress">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                         role="progressbar" style="width: 0%" id="syncProgressBar"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 同期エラー詳細モーダル -->
+<div class="modal fade" id="syncErrorModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">同期エラー詳細</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="syncErrorDetails"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+                <button type="button" class="btn btn-primary" id="retrySyncBtn">再試行</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<script>
+/**
+ * 同期ダッシュボード JavaScript
+ */
+class SyncDashboard {
+    constructor() {
+        this.apiBase = '/api/bulk-users';
+        this.syncHistory = [];
+        this.autoRefreshInterval = null;
+        this.init();
+    }
+
+    init() {
+        this.bindEvents();
+        this.loadInitialData();
+        this.startAutoRefresh();
+    }
+
+    bindEvents() {
+        // 更新ボタン
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            this.loadInitialData();
+        });
+
+        // 同期操作
+        document.getElementById('startSyncBtn').addEventListener('click', () => {
+            this.startSync();
+        });
+
+        document.getElementById('checkSyncBtn').addEventListener('click', () => {
+            this.checkSyncStatus();
+        });
+
+        document.getElementById('validateSyncBtn').addEventListener('click', () => {
+            this.validateSync();
+        });
+
+        // 自動同期設定
+        document.getElementById('updateAutoSyncBtn').addEventListener('click', () => {
+            this.updateAutoSyncSettings();
+        });
+
+        // 再試行ボタン
+        document.getElementById('retrySyncBtn').addEventListener('click', () => {
+            this.retrySync();
+        });
+    }
+
+    async loadInitialData() {
+        await Promise.all([
+            this.loadSyncStatus(),
+            this.loadBatches(),
+            this.loadSyncHistory(),
+            this.loadAutoSyncSettings()
+        ]);
+    }
+
+    async loadSyncStatus() {
+        try {
+            const response = await fetch(`${this.apiBase}/sync/status`);
+            const result = await response.json();
+            
+            document.getElementById('syncStatus').textContent = result.is_valid ? '正常' : '要確認';
+            document.getElementById('totalSyncedUsers').textContent = result.total_checked || 0;
+            document.getElementById('lastSyncTime').textContent = 
+                result.validation_timestamp ? new Date(result.validation_timestamp).toLocaleString() : '-';
+            document.getElementById('syncErrors').textContent = result.inconsistencies ? result.inconsistencies.length : 0;
+            
+        } catch (error) {
+            console.error('同期状況読み込みエラー:', error);
+        }
+    }
+
+    async loadBatches() {
+        try {
+            const response = await fetch(`${this.apiBase}/stats`);
+            const result = await response.json();
+            
+            const select = document.getElementById('syncBatchFilter');
+            select.innerHTML = '<option value="">全バッチ</option>';
+            
+            if (result.batches) {
+                result.batches.forEach(batch => {
+                    const option = document.createElement('option');
+                    option.value = batch.batch_id;
+                    option.textContent = `${batch.batch_id} (${batch.user_count}ユーザー)`;
+                    select.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('バッチ読み込みエラー:', error);
+        }
+    }
+
+    async loadSyncHistory() {
+        // 実際の実装では、同期履歴を保存するテーブルから取得
+        const tbody = document.getElementById('syncHistoryTable');
+        
+        if (this.syncHistory.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">履歴がありません</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = this.syncHistory.map(entry => `
+            <tr>
+                <td>${new Date(entry.timestamp).toLocaleString()}</td>
+                <td>${entry.target}</td>
+                <td>${entry.count}</td>
+                <td>
+                    <span class="badge bg-${entry.success ? 'success' : 'danger'}">
+                        ${entry.success ? '成功' : '失敗'}
+                    </span>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async loadAutoSyncSettings() {
+        // 実際の実装では、設定を取得するAPIを呼び出し
+        document.getElementById('autoSyncEnabled').checked = true;
+        document.getElementById('syncInterval').value = 30;
+    }
+
+    async startSync() {
+        const batchId = document.getElementById('syncBatchFilter').value;
+        const testUsersOnly = document.getElementById('testUsersOnlySync').checked;
+        const target = document.getElementById('syncTarget').value;
+        const forceSync = document.getElementById('forceSyncCheck').checked;
+        
+        const filterCriteria = { test_users_only: testUsersOnly };
+        if (batchId) {
+            filterCriteria.batch_id = batchId;
+        }
+        if (forceSync) {
+            filterCriteria.force = true;
+        }
+
+        const btn = document.getElementById('startSyncBtn');
+        const originalText = btn.innerHTML;
+        
+        try {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 同期中...';
+            
+            this.showProgress(true);
+            this.addLog('同期を開始しています...', 'info');
+            
+            const response = await fetch(`${this.apiBase}/sync`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    target: target,
+                    filter_criteria: filterCriteria
+                })
+            });
+
+            const result = await response.json();
+            
+            if (response.ok) {
+                this.displaySyncResults(result);
+                this.addSyncToHistory(result);
+                this.addLog(`同期完了: ${result.synced_count}件`, 'success');
+            } else {
+                this.showSyncError(result);
+                this.addLog(`同期エラー: ${result.error}`, 'error');
+            }
+            
+            await this.loadSyncStatus();
+            
+        } catch (error) {
+            this.showError('同期エラー', error.message);
+            this.addLog(`通信エラー: ${error.message}`, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            this.showProgress(false);
+        }
+    }
+
+    async checkSyncStatus() {
+        const batchId = document.getElementById('syncBatchFilter').value;
+        
+        try {
+            let url = `${this.apiBase}/sync/status`;
+            if (batchId) {
+                url += `?batch_id=${encodeURIComponent(batchId)}`;
+            }
+            
+            const response = await fetch(url);
+            const result = await response.json();
+            
+            this.displaySyncStatusResults(result);
+            this.addLog('同期状況を確認しました', 'info');
+            
+        } catch (error) {
+            this.showError('状況確認エラー', error.message);
+        }
+    }
+
+    async validateSync() {
+        try {
+            this.addLog('整合性検証を開始しています...', 'info');
+            
+            const response = await fetch(`${this.apiBase}/sync/status`);
+            const result = await response.json();
+            
+            this.displayValidationResults(result);
+            
+            if (result.is_valid) {
+                this.addLog('整合性検証完了: 問題なし', 'success');
+            } else {
+                this.addLog(`整合性検証完了: ${result.inconsistencies.length}件の不整合`, 'warning');
+            }
+            
+        } catch (error) {
+            this.showError('検証エラー', error.message);
+            this.addLog(`検証エラー: ${error.message}`, 'error');
+        }
+    }
+
+    displaySyncResults(result) {
+        const resultsDiv = document.getElementById('syncResults');
+        
+        let html = `
+            <div class="alert alert-${result.success ? 'success' : 'danger'}">
+                <h6><i class="fas fa-sync"></i> 同期結果</h6>
+                <div class="row">
+                    <div class="col-md-6">
+                        <ul class="mb-0">
+                            <li>同期数: ${result.synced_count}</li>
+                            <li>失敗数: ${result.failed_count || 0}</li>
+                            <li>実行時間: ${result.duration ? result.duration.toFixed(2) + '秒' : 'N/A'}</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <ul class="mb-0">
+                            <li>対象: ${result.target}</li>
+                            <li>フィルター: ${JSON.stringify(result.filter_criteria)}</li>
+                            <li>タイムスタンプ: ${new Date(result.sync_timestamp).toLocaleString()}</li>
+                        </ul>
+                    </div>
+                </div>
+        `;
+        
+        if (result.errors && result.errors.length > 0) {
+            html += `
+                <div class="mt-3">
+                    <strong>エラー詳細:</strong>
+                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="syncDashboard.showErrorDetails(${JSON.stringify(result.errors).replace(/"/g, '&quot;')})">
+                        詳細表示
+                    </button>
+                </div>
+            `;
+        }
+        
+        html += `</div>`;
+        resultsDiv.innerHTML = html;
+    }
+
+    displaySyncStatusResults(result) {
+        const resultsDiv = document.getElementById('syncResults');
+        
+        let html = `
+            <div class="alert alert-${result.is_valid ? 'success' : 'warning'}">
+                <h6><i class="fas fa-search"></i> 同期状況確認結果</h6>
+                <div class="row">
+                    <div class="col-md-6">
+                        <ul class="mb-0">
+                            <li>整合性: ${result.is_valid ? '正常' : '不整合あり'}</li>
+                            <li>確認件数: ${result.total_checked}</li>
+                            <li>不整合件数: ${result.inconsistencies ? result.inconsistencies.length : 0}</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <ul class="mb-0">
+                            <li>確認時刻: ${new Date(result.validation_timestamp).toLocaleString()}</li>
+                            <li>バッチID: ${result.batch_id || '全バッチ'}</li>
+                        </ul>
+                    </div>
+                </div>
+        `;
+        
+        if (result.inconsistencies && result.inconsistencies.length > 0) {
+            html += `
+                <div class="mt-3">
+                    <strong>不整合詳細:</strong>
+                    <ul class="mt-2">
+            `;
+            result.inconsistencies.forEach(inconsistency => {
+                html += `<li>${inconsistency}</li>`;
+            });
+            html += `</ul></div>`;
+        }
+        
+        html += `</div>`;
+        resultsDiv.innerHTML = html;
+    }
+
+    displayValidationResults(result) {
+        const resultsDiv = document.getElementById('syncResults');
+        
+        let html = `
+            <div class="alert alert-${result.is_valid ? 'success' : 'warning'}">
+                <h6><i class="fas fa-check"></i> 整合性検証結果</h6>
+                <p><strong>結果:</strong> ${result.is_valid ? '整合性に問題なし' : '不整合が検出されました'}</p>
+        `;
+        
+        if (!result.is_valid && result.inconsistencies) {
+            html += `
+                <div class="mt-3">
+                    <strong>検出された問題:</strong>
+                    <ul class="mt-2">
+            `;
+            result.inconsistencies.forEach(issue => {
+                html += `<li>${issue}</li>`;
+            });
+            html += `</ul>
+                    <button class="btn btn-warning mt-2" onclick="syncDashboard.fixInconsistencies()">
+                        <i class="fas fa-wrench"></i> 自動修復
+                    </button>
+                </div>
+            `;
+        }
+        
+        html += `</div>`;
+        resultsDiv.innerHTML = html;
+    }
+
+    showProgress(show) {
+        const progressDiv = document.getElementById('syncProgress');
+        progressDiv.style.display = show ? 'block' : 'none';
+        
+        if (show) {
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 20;
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+                }
+                
+                document.getElementById('syncProgressBar').style.width = `${progress}%`;
+                document.getElementById('syncProgressText').textContent = `${Math.round(progress)}%`;
+            }, 500);
+        }
+    }
+
+    addLog(message, type = 'info') {
+        const logsDiv = document.getElementById('syncLogs');
+        const timestamp = new Date().toLocaleTimeString();
+        
+        const colorClass = {
+            'info': 'text-info',
+            'success': 'text-success',
+            'warning': 'text-warning',
+            'error': 'text-danger'
+        }[type] || 'text-light';
+        
+        const logEntry = document.createElement('div');
+        logEntry.className = colorClass;
+        logEntry.innerHTML = `[${timestamp}] ${message}`;
+        
+        logsDiv.appendChild(logEntry);
+        logsDiv.scrollTop = logsDiv.scrollHeight;
+        
+        // 最大100行まで保持
+        while (logsDiv.children.length > 100) {
+            logsDiv.removeChild(logsDiv.firstChild);
+        }
+    }
+
+    addSyncToHistory(result) {
+        this.syncHistory.unshift({
+            timestamp: result.sync_timestamp || new Date().toISOString(),
+            target: result.target || 'load_tester',
+            count: result.synced_count || 0,
+            success: result.success
+        });
+        
+        // 最大50件まで保持
+        if (this.syncHistory.length > 50) {
+            this.syncHistory = this.syncHistory.slice(0, 50);
+        }
+        
+        this.loadSyncHistory();
+    }
+
+    showErrorDetails(errors) {
+        const modal = new bootstrap.Modal(document.getElementById('syncErrorModal'));
+        const detailsDiv = document.getElementById('syncErrorDetails');
+        
+        let html = '<ul class="list-group list-group-flush">';
+        errors.forEach(error => {
+            html += `<li class="list-group-item">${error}</li>`;
+        });
+        html += '</ul>';
+        
+        detailsDiv.innerHTML = html;
+        modal.show();
+    }
+
+    showSyncError(result) {
+        this.showError('同期エラー', result.error || '不明なエラーが発生しました');
+        
+        if (result.errors && result.errors.length > 0) {
+            this.showErrorDetails(result.errors);
+        }
+    }
+
+    async updateAutoSyncSettings() {
+        const enabled = document.getElementById('autoSyncEnabled').checked;
+        const interval = parseInt(document.getElementById('syncInterval').value);
+        
+        // 実際の実装では、設定を保存するAPIを呼び出し
+        this.addLog(`自動同期設定を更新しました: ${enabled ? '有効' : '無効'}, 間隔: ${interval}分`, 'success');
+    }
+
+    async retrySync() {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('syncErrorModal'));
+        modal.hide();
+        
+        await this.startSync();
+    }
+
+    async fixInconsistencies() {
+        try {
+            this.addLog('不整合の自動修復を開始しています...', 'info');
+            
+            // 強制同期で修復を試行
+            const response = await fetch(`${this.apiBase}/sync`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    target: 'load_tester',
+                    filter_criteria: {
+                        test_users_only: true,
+                        force: true
+                    }
+                })
+            });
+
+            const result = await response.json();
+            
+            if (result.success) {
+                this.addLog('不整合の修復が完了しました', 'success');
+                await this.validateSync();
+            } else {
+                this.addLog('修復に失敗しました', 'error');
+            }
+            
+        } catch (error) {
+            this.addLog(`修復エラー: ${error.message}`, 'error');
+        }
+    }
+
+    startAutoRefresh() {
+        // 30秒ごとに状況を更新
+        this.autoRefreshInterval = setInterval(() => {
+            this.loadSyncStatus();
+        }, 30000);
+    }
+
+    showError(title, message) {
+        // 簡易的なエラー表示
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-danger alert-dismissible fade show position-fixed';
+        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        alertDiv.innerHTML = `
+            <strong>${title}</strong><br>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(alertDiv);
+        
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.parentNode.removeChild(alertDiv);
+            }
+        }, 5000);
+    }
+}
+
+// 初期化
+let syncDashboard;
+document.addEventListener('DOMContentLoaded', () => {
+    syncDashboard = new SyncDashboard();
+});
+</script>
+
+{% endblock %}

@@ -1278,3 +1278,134 @@ async def reset_session_manager():
     except Exception as e:
         logger.error(f"Error resetting session manager: {e}")
         raise HTTPException(status_code=500, detail="Failed to reset session manager")
+
+# User Sync API Endpoints
+
+class UserImportRequest(BaseModel):
+    """Request model for user import"""
+    users: List[Dict[str, Any]]
+    export_timestamp: str
+    source_system: str
+    total_count: int
+    metadata: Dict[str, Any] = {}
+
+@router.post("/users/import")
+async def import_users(request: UserImportRequest):
+    """Main Applicationからのユーザーデータをインポート"""
+    try:
+        from user_sync_api import UserSyncAPI
+        
+        data = request.dict()
+        
+        sync_api = UserSyncAPI()
+        result = sync_api.import_users(data)
+        
+        return result.to_dict()
+        
+    except Exception as e:
+        logger.error(f'Import API error: {str(e)}')
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get("/users/sync-status")
+async def get_sync_status():
+    """同期状況取得"""
+    try:
+        from user_sync_api import UserSyncAPI
+        
+        sync_api = UserSyncAPI()
+        status = sync_api.get_sync_status()
+        return status
+        
+    except Exception as e:
+        logger.error(f'Sync status API error: {str(e)}')
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.post("/users/sessions/bulk-login")
+async def bulk_login():
+    """一括ログイン実行"""
+    try:
+        from user_sync_api import UserSyncAPI
+        
+        sync_api = UserSyncAPI()
+        result = sync_api.bulk_login_users()
+        
+        status_code = 200 if result.get("success", False) else 400
+        return result
+        
+    except Exception as e:
+        logger.error(f'Bulk login API error: {str(e)}')
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get("/users/health")
+async def health_check():
+    """ヘルスチェック"""
+    from datetime import datetime
+    return {
+        'status': 'healthy',
+        'timestamp': datetime.utcnow().isoformat(),
+        'service': 'user_sync_api'
+    }
+
+# バッチ管理エンドポイント
+
+@router.get("/users/batches")
+async def get_batch_info():
+    """バッチ情報取得"""
+    try:
+        from user_sync_api import UserSyncAPI
+        
+        sync_api = UserSyncAPI()
+        batch_info = sync_api.get_batch_info()
+        
+        return batch_info
+        
+    except Exception as e:
+        logger.error(f'Batch info API error: {str(e)}')
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.post("/users/batches/{batch_id}/login")
+async def login_batch_users(batch_id: str):
+    """指定バッチのユーザーで一括ログイン"""
+    try:
+        from user_sync_api import UserSyncAPI
+        
+        sync_api = UserSyncAPI()
+        result = sync_api.login_batch(batch_id)
+        
+        status_code = 200 if result.get("success", False) else 400
+        return result
+        
+    except Exception as e:
+        logger.error(f'Batch login API error: {str(e)}')
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.delete("/users/batches/{batch_id}")
+async def remove_batch_users(batch_id: str):
+    """指定バッチのユーザーを削除"""
+    try:
+        from user_sync_api import UserSyncAPI
+        
+        sync_api = UserSyncAPI()
+        result = sync_api.remove_batch(batch_id)
+        
+        status_code = 200 if result.get("success", False) else 400
+        return result
+        
+    except Exception as e:
+        logger.error(f'Batch removal API error: {str(e)}')
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get("/users/batches/{batch_id}/stats")
+async def get_batch_stats(batch_id: str):
+    """指定バッチのセッション統計取得"""
+    try:
+        from user_session_manager import get_user_session_manager
+        
+        manager = get_user_session_manager()
+        stats = manager.get_batch_session_stats(batch_id)
+        
+        return stats
+        
+    except Exception as e:
+        logger.error(f'Batch stats API error: {str(e)}')
+        raise HTTPException(status_code=500, detail="Internal server error")
