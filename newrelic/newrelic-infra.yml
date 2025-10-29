@@ -1,0 +1,42 @@
+# New Relic Infrastructure Agent Configuration
+# This file configures the New Relic Infrastructure Agent for PostgreSQL monitoring
+
+# License key from environment variable (required)
+license_key: ${NRIA_LICENSE_KEY}
+
+# Display name for this agent instance
+display_name: ${NRIA_DISPLAY_NAME}
+
+# Log level for the agent (debug, info, warn, error)
+log_level: info
+
+# Log file location (stdout for container)
+log_file: stdout
+
+# Enable verbose logging for troubleshooting
+verbose: 0
+
+# Metrics collection interval (seconds)
+metrics_system_sample_rate: 10
+metrics_storage_sample_rate: 20
+metrics_network_sample_rate: 10
+metrics_process_sample_rate: 20
+
+# Enable integrations
+enable_process_metrics: true
+
+# Custom attributes for this agent
+custom_attributes:
+  environment: docker
+  service: flask-ec-app
+  database: postgresql
+
+# Proxy settings (if needed)
+# proxy: http://proxy.example.com:8080
+
+# Disable specific features if needed
+# disable_cloud_metadata: false
+# disable_zero_rpm_process: false
+
+# Integration configuration directory
+plugin_dir: /etc/newrelic-infra/integrations.d/

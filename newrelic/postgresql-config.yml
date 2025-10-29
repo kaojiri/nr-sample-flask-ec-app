@@ -1,0 +1,86 @@
+integrations:
+  # Standard PostgreSQL metrics collection
+  - name: nri-postgresql
+    env:
+      # PostgreSQL connection configuration
+      HOSTNAME: postgres
+      PORT: 5432
+      USERNAME: postgres
+      PASSWORD: postgres
+      DATABASE: ecdb
+      
+      # SSL configuration (disabled for local development)
+      SSL_MODE: disable
+      
+      # Collection configuration
+      COLLECTION_LIST: 'ALL'
+      COLLECT_DB_LOCK_METRICS: true
+      COLLECT_BLOAT_METRICS: true
+      
+      # Query Performance Monitoring - REQUIRED for Query Details
+      ENABLE_QUERY_MONITORING: true
+      PG_STAT_STATEMENTS: true
+      
+      # Custom query collection
+      CUSTOM_METRICS_QUERY: >
+        SELECT 
+          'connections' as metric_name,
+          'gauge' as metric_type,
+          numbackends as metric_value,
+          datname as database
+        FROM pg_stat_database
+        WHERE datname NOT IN ('template0', 'template1', 'postgres')
+        UNION ALL
+        SELECT 
+          'database_size_bytes' as metric_name,
+          'gauge' as metric_type,
+          pg_database_size(datname) as metric_value,
+          datname as database
+        FROM pg_stat_database
+        WHERE datname NOT IN ('template0', 'template1', 'postgres');
+      
+      # Connection settings
+      ENABLE_SSL: false
+      TIMEOUT: 10
+      
+    interval: 30s
+    labels:
+      environment: development
+      service: flask-ec-app
+    inventory_source: config/postgresql
+
+  # Dedicated Query Performance Monitoring integration
+  - name: nri-postgresql
+    env:
+      HOSTNAME: postgres
+      PORT: 5432
+      USERNAME: postgres
+      PASSWORD: postgres
+      DATABASE: ecdb
+      
+      # SSL configuration
+      SSL_MODE: disable
+      ENABLE_SSL: false
+      
+      # Query Performance Monitoring specific settings
+      ENABLE_QUERY_MONITORING: true
+      PG_STAT_STATEMENTS: true
+      QUERY_LOGGING_ENABLED: true
+      
+      # Query collection settings
+      QUERY_MONITORING_COUNT_THRESHOLD: 20
+      QUERY_MONITORING_RESPONSE_TIME_THRESHOLD: 1000  # milliseconds (1 second)
+      
+      # Lock and wait monitoring
+      COLLECT_DB_LOCK_METRICS: true
+      COLLECT_BLOAT_METRICS: true
+      
+      # Connection timeout
+      TIMEOUT: 10
+      
+    interval: 60s
+    labels:
+      environment: development
+      service: flask-ec-app
+      monitoring_type: query_performance
+    inventory_source: config/postgresql-performance
