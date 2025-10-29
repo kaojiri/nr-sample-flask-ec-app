@@ -58,7 +58,7 @@ def create_bulk_users():
         config_data = data.get('config', {})
         config = UserCreationConfig(
             username_pattern=config_data.get('username_pattern', 'testuser_{id}@example.com'),
-            password=config_data.get('password', 'TestPass123!'),
+            password=config_data.get('password', 'TestPass123'),
             email_domain=config_data.get('email_domain', 'example.com'),
             batch_size=config_data.get('batch_size', 100),
             custom_attributes=config_data.get('custom_attributes', {}),
@@ -184,6 +184,7 @@ def export_users():
                     'id': user.id,
                     'username': user.username,
                     'email': user.email,
+                    'password': 'TestPass123!',  # Load Tester用の固定パスワード
                     'is_test_user': user.is_test_user,
                     'test_batch_id': user.test_batch_id,
                     'created_by_bulk': user.created_by_bulk,

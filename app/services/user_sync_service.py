@@ -51,11 +51,14 @@ class TestUserData:
     @classmethod
     def from_user(cls, user: User, include_password: bool = False) -> 'TestUserData':
         """UserモデルからTestUserDataを作成"""
+        import os
+        default_password = os.getenv('BULK_USER_DEFAULT_PASSWORD', 'TestPass123')
+
         return cls(
             id=user.id,
             username=user.username,
             email=user.email,
-            password="TestPass123!" if include_password else "",  # デフォルトパスワード
+            password=default_password if include_password else "",  # 環境変数から取得したデフォルトパスワード
             is_test_user=user.is_test_user,
             test_batch_id=user.test_batch_id,
             created_by_bulk=user.created_by_bulk,

@@ -297,13 +297,15 @@ class UserSessionManager:
                 
                 # Use aiohttp directly for more reliable HTTP requests
                 async with aiohttp.ClientSession() as session:
-                    # Encode form data
-                    form_data = aiohttp.FormData()
-                    form_data.add_field('email', user.username)
-                    form_data.add_field('password', user.password)
-                    
+                    # Encode form data as application/x-www-form-urlencoded (not multipart/form-data)
+                    form_data = {
+                        'email': user.username,
+                        'password': user.password
+                    }
+
                     logger.debug(f"Making request to {login_url}")
-                    
+                    logger.debug(f"Login credentials: email={user.username}, password={'*' * len(user.password)}")
+
                     async with session.post(login_url, data=form_data, allow_redirects=False) as response:
                         logger.debug(f"Request completed: {response.status}")
                         logger.debug(f"Response headers: {dict(response.headers)}")
@@ -605,11 +607,10 @@ class UserSessionManager:
             for user in users:
                 self.test_users[user.user_id] = user
             
-            # Update configuration file
-            config = config_manager.get_config()
-            config["test_users"] = [user.to_dict() for user in users]
+            # Update configuration file using config_manager's method
+            user_dicts = [user.to_dict() for user in users]
             
-            if config_manager.update_config(config):
+            if config_manager.update_test_users_config(user_dicts):
                 self.stats.total_users = len(self.test_users)
                 logger.info(f"Updated test users configuration with {len(users)} users")
                 return True

@@ -41,12 +41,16 @@ def create_app():
                 # Additional attributes for compatibility and enhanced tracking
                 newrelic.agent.add_custom_attribute('userId', str(current_user.id))
                 newrelic.agent.add_custom_attribute('user', current_user.username)
+
+                # DEBUG: Log when attributes are set
+                app.logger.info(f'✅ New Relic attributes set for user: {current_user.username} (ID: {current_user.id})')
         except ImportError:
             # New Relic is not installed or not running
+            app.logger.warning('⚠️ New Relic not available (ImportError)')
             pass
         except Exception as e:
             # Avoid breaking the request if attribute setting fails
-            app.logger.debug(f'Failed to set New Relic custom attributes: {e}')
+            app.logger.error(f'❌ Failed to set New Relic custom attributes: {e}')
 
     # Register blueprints
     from app.routes import main, auth, products, cart, performance_issues, bulk_users, error_reports

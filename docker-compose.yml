@@ -28,8 +28,11 @@ services:
       - SECRET_KEY=dev-secret-key-for-local
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ecdb
       - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY:-your-license-key-here}
+      - NEW_RELIC_USER_KEY=${NEW_RELIC_USER_KEY:-your-user-key-here}
       - NEW_RELIC_ENVIRONMENT=development
       - NEW_RELIC_APP_NAME=Flask-EC-App-Local
+      - BULK_USER_DEFAULT_PASSWORD=TestPass123
+      - LOAD_TESTER_URL=http://load-tester:8080
     ports:
       - "5001:5000"
     volumes:

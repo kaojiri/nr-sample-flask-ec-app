@@ -1346,6 +1346,69 @@ async def health_check():
         'service': 'user_sync_api'
     }
 
+@router.get("/users/debug/list")
+async def debug_list_users():
+    """デバッグ用: 全ユーザーリスト表示"""
+    try:
+        from user_session_manager import get_user_session_manager
+        from datetime import datetime
+        
+        manager = get_user_session_manager()
+        test_users = manager.get_test_users()
+        
+        users_info = []
+        for user in test_users:
+            users_info.append({
+                "user_id": user.user_id,
+                "username": user.username,
+                "enabled": user.enabled,
+                "description": user.description,
+                "test_batch_id": getattr(user, 'test_batch_id', None),
+                "is_bulk_created": getattr(user, 'is_bulk_created', False)
+            })
+        
+        return {
+            "total_users": len(users_info),
+            "users": users_info,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f'Debug list users error: {str(e)}')
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get("/users/debug/batches")
+async def debug_list_batches():
+    """デバッグ用: バッチ情報表示"""
+    try:
+        from user_session_manager import get_user_session_manager
+        from datetime import datetime
+        
+        manager = get_user_session_manager()
+        test_users = manager.get_test_users()
+        
+        # バッチごとにユーザーをグループ化
+        batches = {}
+        for user in test_users:
+            batch_id = getattr(user, 'test_batch_id', None) or 'no_batch'
+            if batch_id not in batches:
+                batches[batch_id] = []
+            batches[batch_id].append({
+                "user_id": user.user_id,
+                "username": user.username,
+                "enabled": user.enabled
+            })
+        
+        return {
+            "total_batches": len(batches),
+            "batches": batches,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f'Debug list batches error: {str(e)}')
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 # バッチ管理エンドポイント
 
 @router.get("/users/batches")
@@ -1409,3 +1472,38 @@ async def get_batch_stats(batch_id: str):
     except Exception as e:
         logger.error(f'Batch stats API error: {str(e)}')
         raise HTTPException(status_code=500, detail="Internal server error")
+
+# クリーンアップAPI
+
+class CleanupRequest(BaseModel):
+    """Request model for cleanup operations"""
+    batch_id: str
+    users_to_delete: List[Dict[str, Any]] = []
+    source: str = "main_application"
+
+@router.post("/users/cleanup")
+async def cleanup_users(request: CleanupRequest):
+    """Main Applicationからのクリーンアップリクエストを処理"""
+    try:
+        from user_sync_api import UserSyncAPI
+        
+        sync_api = UserSyncAPI()
+        
+        # バッチIDが指定されている場合はバッチ削除
+        if request.batch_id and request.batch_id != "all":
+            result = sync_api.remove_batch(request.batch_id)
+        else:
+            # 全ユーザークリーンアップ
+            result = sync_api.cleanup_all_test_users()
+        
+        logger.info(f"Cleanup request from {request.source}: batch_id={request.batch_id}, result={result.get('success', False)}")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f'Cleanup API error: {str(e)}')
+        return {
+            "success": False,
+            "error": f"クリーンアップ処理エラー: {str(e)}",
+            "timestamp": datetime.utcnow().isoformat()
+        }

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     
     # Target application settings
     target_app_url: str = Field(
-        default="http://app:5000",
+        default="http://web:5000",
         description="URL of the target Flask application"
     )
     
@@ -148,7 +148,7 @@ class ConfigManager:
                 "auto_login_on_sync": True,
                 "max_bulk_users": 1000,
                 "cleanup_on_shutdown": True,
-                "main_app_url": "http://app:5000",
+                "main_app_url": "http://web:5000",
                 "auto_reload_on_import": True,
                 "batch_login_enabled": True,
                 "preserve_existing_users": False
@@ -282,8 +282,10 @@ class ConfigManager:
     def update_test_users_config(self, test_users: List[Dict]) -> bool:
         """Update test users configuration"""
         try:
+            print(f"DEBUG: Updating config with {len(test_users)} users")
             self.config["test_users"] = test_users
             self.save_config()
+            print(f"DEBUG: Config saved successfully")
             return True
         except Exception as e:
             print(f"Error updating test users config: {e}")

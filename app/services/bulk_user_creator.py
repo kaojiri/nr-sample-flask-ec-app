@@ -470,7 +470,7 @@ class BulkUserCreator:
         if not security_service.ensure_test_user_separation(user_data):
             raise ValueError("テストユーザーの分離要件を満たしていません")
         
-        if self.bulk_insert_enabled and count >= 50:
+        if self.bulk_insert_enabled and count >= 5:  # 5ユーザー以上で最適化版を使用
             return self.create_bulk_users_optimized(count, config)
         else:
             return self.create_bulk_users_legacy(count, config)
@@ -658,8 +658,8 @@ class BulkUserCreator:
                 # Generate email
                 email = f"testuser_{unique_id}@{config.email_domain}"
                 
-                # セキュアなパスワード生成
-                password = config.generate_secure_password(int(unique_id.split('_')[-1]))
+                # 設定で指定されたパスワードを使用（テスト用途）
+                password = config.password
                 
                 batch_credentials.append(UserCredentials(
                     username=username,
@@ -734,18 +734,20 @@ class BulkUserCreator:
                     user = User(
                         username=cred.username,
                         email=cred.email,
-                        password_hash=generate_password_hash(cred.password),
                         is_test_user=True,
                         test_batch_id=config.test_batch_id,
                         created_by_bulk=True,
                         created_at=datetime.utcnow()
                     )
+                    # set_password メソッドを使用してパスワードを正しく設定
+                    user.set_password(cred.password)
                     user_objects.append(user)
                 
-                # 一括挿入実行
+                # 個別挿入実行（パスワードハッシュを正しく保存するため）
                 try:
                     with self._db_lock:
-                        db.session.bulk_save_objects(user_objects, return_defaults=True)
+                        for user_obj in user_objects:
+                            db.session.add(user_obj)
                         db.session.commit()
                     
                     # 成功したユーザーを記録
@@ -847,17 +849,19 @@ class BulkUserCreator:
                 user = User(
                     username=cred.username,
                     email=cred.email,
-                    password_hash=generate_password_hash(cred.password),
                     is_test_user=True,
                     test_batch_id=config.test_batch_id,
                     created_by_bulk=True,
                     created_at=datetime.utcnow()
                 )
+                # set_password メソッドを使用してパスワードを正しく設定
+                user.set_password(cred.password)
                 user_objects.append(user)
             
-            # スレッドセーフな一括挿入
+            # スレッドセーフな個別挿入（パスワードハッシュを正しく保存するため）
             with self._db_lock:
-                db.session.bulk_save_objects(user_objects, return_defaults=True)
+                for user_obj in user_objects:
+                    db.session.add(user_obj)
                 db.session.commit()
             
             # 成功したユーザーを記録
@@ -954,8 +958,8 @@ class BulkUserCreator:
                 self.logger.debug(f"従来版重複チェックをスキップ: {str(e)}")
                 pass
             
-            # セキュアなパスワード生成
-            password = config.generate_secure_password(i + 1)
+            # 設定で指定されたパスワードを使用（テスト用途）
+            password = config.password
             
             credentials.append(UserCredentials(
                 username=username,
