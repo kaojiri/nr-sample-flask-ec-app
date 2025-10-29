@@ -65,12 +65,12 @@ def execute_slow_query():
 
 def create_lock_contention():
     """ロック競合を生成"""
-    app = create_app()
-    with app.app_context():
-        print("🔒 ロック競合を生成中...")
-        try:
-            # トランザクション1: 商品の在庫を更新
-            def update_stock_1():
+    print("🔒 ロック競合を生成中...")
+    try:
+        # トランザクション1: 商品の在庫を更新
+        def update_stock_1():
+            app = create_app()
+            with app.app_context():
                 with db.session.begin():
                     product = db.session.query(Product).first()
                     if product:
@@ -80,9 +80,11 @@ def create_lock_contention():
                         db.session.commit()
                         print("   ✅ トランザクション1完了")
 
-            # トランザクション2: 同じ商品の在庫を更新
-            def update_stock_2():
-                time.sleep(0.5)  # 少し待ってからロックを取得しに行く
+        # トランザクション2: 同じ商品の在庫を更新
+        def update_stock_2():
+            time.sleep(0.5)  # 少し待ってからロックを取得しに行く
+            app = create_app()
+            with app.app_context():
                 with db.session.begin():
                     product = db.session.query(Product).first()
                     if product:
@@ -91,25 +93,25 @@ def create_lock_contention():
                         db.session.commit()
                         print("   ✅ トランザクション2完了")
 
-            # 両方のトランザクションを同時に実行
-            t1 = threading.Thread(target=update_stock_1)
-            t2 = threading.Thread(target=update_stock_2)
-            t1.start()
-            t2.start()
-            t1.join()
-            t2.join()
+        # 両方のトランザクションを同時に実行
+        t1 = threading.Thread(target=update_stock_1)
+        t2 = threading.Thread(target=update_stock_2)
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
 
-        except Exception as e:
-            print(f"   ❌ エラー: {e}")
+    except Exception as e:
+        print(f"   ❌ エラー: {e}")
 
 def generate_concurrent_load():
     """同時接続による負荷を生成"""
-    app = create_app()
-    with app.app_context():
-        print("🔄 同時接続負荷を生成中...")
-        try:
-            # 複数の同時クエリを実行
-            def execute_query():
+    print("🔄 同時接続負荷を生成中...")
+    try:
+        # 複数の同時クエリを実行
+        def execute_query():
+            app = create_app()
+            with app.app_context():
                 # ランダムな待機を入れて複雑なクエリを実行
                 db.session.execute(text(f"""
                     WITH RECURSIVE deep_tree AS (
@@ -131,16 +133,16 @@ def generate_concurrent_load():
                     SELECT * FROM heavy_calc;
                 """))
 
-            # 10個の同時接続を作成
-            with ThreadPoolExecutor(max_workers=10) as executor:
-                futures = [executor.submit(execute_query) for _ in range(10)]
-                for future in futures:
-                    future.result()
+        # 10個の同時接続を作成
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [executor.submit(execute_query) for _ in range(10)]
+            for future in futures:
+                future.result()
 
-            print("   ✅ 同時接続負荷生成完了")
+        print("   ✅ 同時接続負荷生成完了")
 
-        except Exception as e:
-            print(f"   ❌ エラー: {e}")
+    except Exception as e:
+        print(f"   ❌ エラー: {e}")
 
 def run_load_test(duration_seconds=300):  # 5分間実行
     """負荷テストを実行"""

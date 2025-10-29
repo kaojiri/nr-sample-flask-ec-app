@@ -8,13 +8,13 @@ license_key: ${NRIA_LICENSE_KEY}
 display_name: ${NRIA_DISPLAY_NAME}
 
 # Log level for the agent (debug, info, warn, error)
-log_level: info
+log_level: debug
 
 # Log file location (stdout for container)
 log_file: stdout
 
 # Enable verbose logging for troubleshooting
-verbose: 0
+verbose: 1
 
 # Metrics collection interval (seconds)
 metrics_system_sample_rate: 10

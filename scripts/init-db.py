@@ -143,6 +143,8 @@ def init_db():
         print("\nTest user credentials:")
         print("Email: test@example.com")
         print("Password: password123")
+        
+
 
 if __name__ == '__main__':
     init_db()

@@ -239,14 +239,21 @@ class NewRelicInfrastructureIntegrationTest:
                 databases = [row[0] for row in cursor.fetchall()]
                 print(f"   ✅ データベース一覧: {databases}")
                 
-                # pg_stat_statementsの確認（Query Performance Monitoring用）
-                cursor.execute("""
-                    SELECT EXISTS (
-                        SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_statements'
-                    );
-                """)
-                pg_stat_statements_exists = cursor.fetchone()[0]
-                print(f"   pg_stat_statements拡張: {'✅ 有効' if pg_stat_statements_exists else '⚠️  無効'}")
+                # New Relic監視用拡張の確認
+                extensions_to_check = [
+                    ('pg_stat_statements', 'Query Performance Monitoring用'),
+                    ('pg_wait_sampling', 'Wait Time Analysis用'),
+                    ('pg_stat_monitor', '詳細なクエリ監視用')
+                ]
+                
+                for ext_name, ext_purpose in extensions_to_check:
+                    cursor.execute("""
+                        SELECT EXISTS (
+                            SELECT 1 FROM pg_extension WHERE extname = %s
+                        );
+                    """, (ext_name,))
+                    ext_exists = cursor.fetchone()[0]
+                    print(f"   {ext_name}拡張 ({ext_purpose}): {'✅ 有効' if ext_exists else '⚠️  無効'}")
                 
                 # 統計情報テーブルの確認
                 stats_tables = [

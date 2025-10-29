@@ -7,6 +7,10 @@ integrations:
       PORT: 5432
       USERNAME: postgres
       PASSWORD: postgres
+      
+      # Query collection settings - より多くのクエリをキャプチャ
+      QUERY_MONITORING_COUNT_THRESHOLD: 5   # より少ない実行回数でもキャプチャ
+      QUERY_MONITORING_RESPONSE_TIME_THRESHOLD: 100  # milliseconds (0.1 second)
       DATABASE: ecdb
       
       # SSL configuration (disabled for local development)
@@ -48,39 +52,3 @@ integrations:
       environment: development
       service: flask-ec-app
     inventory_source: config/postgresql
-
-  # Dedicated Query Performance Monitoring integration
-  - name: nri-postgresql
-    env:
-      HOSTNAME: postgres
-      PORT: 5432
-      USERNAME: postgres
-      PASSWORD: postgres
-      DATABASE: ecdb
-      
-      # SSL configuration
-      SSL_MODE: disable
-      ENABLE_SSL: false
-      
-      # Query Performance Monitoring specific settings
-      ENABLE_QUERY_MONITORING: true
-      PG_STAT_STATEMENTS: true
-      QUERY_LOGGING_ENABLED: true
-      
-      # Query collection settings
-      QUERY_MONITORING_COUNT_THRESHOLD: 20
-      QUERY_MONITORING_RESPONSE_TIME_THRESHOLD: 1000  # milliseconds (1 second)
-      
-      # Lock and wait monitoring
-      COLLECT_DB_LOCK_METRICS: true
-      COLLECT_BLOAT_METRICS: true
-      
-      # Connection timeout
-      TIMEOUT: 10
-      
-    interval: 60s
-    labels:
-      environment: development
-      service: flask-ec-app
-      monitoring_type: query_performance
-    inventory_source: config/postgresql-performance

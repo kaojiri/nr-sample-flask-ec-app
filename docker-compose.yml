@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:15
+    build: ./postgres
     container_name: flask-ec-postgres
     environment:
       POSTGRES_DB: ecdb
@@ -12,18 +12,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./postgres/init-scripts:/docker-entrypoint-initdb.d:ro
-    command: [
-      "postgres",
-      "-c", "shared_preload_libraries=pg_stat_statements",
-      "-c", "pg_stat_statements.max=1000",
-      "-c", "pg_stat_statements.track=top",
-      "-c", "track_activities=on",
-      "-c", "track_counts=on",
-      "-c", "track_io_timing=on"
-    ]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 5s
       timeout: 5s
       retries: 5

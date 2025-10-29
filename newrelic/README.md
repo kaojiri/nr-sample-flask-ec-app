@@ -232,23 +232,59 @@ docker-compose logs newrelic-infra | grep -i "sending"
 - ファイアウォールやプロキシ設定を確認
 - New Relicのサービス状況を確認
 
-#### 4. Query Performance Monitoringが動作しない
+#### 4. Query Performance MonitoringとWait Time Analysisが動作しない
 
-**症状**: 基本メトリクスは収集されるが、クエリパフォーマンスデータが表示されない
+**症状**: 基本メトリクスは収集されるが、クエリパフォーマンスデータや待機イベントが表示されない
 
 **確認事項**:
 ```bash
-# pg_stat_statementsの有効化確認
-docker-compose exec postgres psql -U postgres -d ecdb -c "SELECT * FROM pg_stat_statements LIMIT 1;"
+# New Relic監視用拡張の確認
+docker-compose exec postgres psql -U postgres -d ecdb -c "
+SELECT extname, extversion 
+FROM pg_extension 
+WHERE extname IN ('pg_stat_statements', 'pg_wait_sampling', 'pg_stat_monitor')
+ORDER BY extname;
+"
+
+# pg_stat_statementsの動作確認
+docker-compose exec postgres psql -U postgres -d ecdb -c "SELECT count(*) FROM pg_stat_statements;"
+
+# pg_wait_samplingの動作確認
+docker-compose exec postgres psql -U postgres -d ecdb -c "SELECT count(*) FROM pg_wait_sampling_history;"
 ```
 
 **解決方法**:
-- PostgreSQLで`pg_stat_statements`拡張が有効になっているか確認
-- 必要に応じてPostgreSQLの設定を更新：
+- PostgreSQLで必要な拡張が有効になっているか確認
+- カスタムPostgreSQLイメージが正しくビルドされているか確認：
+  ```bash
+  # PostgreSQLコンテナの再ビルド
+  docker-compose build postgres
+  docker-compose up -d postgres
+  ```
+- 必要に応じて手動で拡張を有効化：
   ```sql
   -- PostgreSQLコンテナ内で実行
   CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+  CREATE EXTENSION IF NOT EXISTS pg_wait_sampling;
+  CREATE EXTENSION IF NOT EXISTS pg_stat_monitor;
   ```
+
+### New Relic監視用PostgreSQL拡張の詳細
+
+#### pg_stat_statements
+- **目的**: Query Performance Monitoring
+- **機能**: 実行されたSQLクエリの統計情報を収集
+- **New Relicでの表示**: Query details、実行時間、実行回数
+
+#### pg_wait_sampling  
+- **目的**: Wait Time Analysis
+- **機能**: 待機イベントのサンプリングとプロファイリング
+- **New Relicでの表示**: Wait events、ロック待機、I/O待機の詳細
+
+#### pg_stat_monitor
+- **目的**: 詳細なクエリ監視
+- **機能**: クエリプランの収集、正規化されたクエリの統計
+- **New Relicでの表示**: より詳細なクエリパフォーマンス情報
 
 ### ログレベルの調整
 
