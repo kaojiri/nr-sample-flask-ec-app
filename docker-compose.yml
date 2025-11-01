@@ -43,6 +43,25 @@ services:
     networks:
       - flask-ec-network
 
+  distributed-service:
+    build: ./distributed-service
+    container_name: flask-ec-distributed-service
+    environment:
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ecdb
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY:-your-license-key-here}
+      - NEW_RELIC_APP_NAME=Flask-EC-Distributed-Service
+      - NEW_RELIC_ENVIRONMENT=development
+    ports:
+      - "5002:5000"
+    volumes:
+      - ./distributed-service:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - flask-ec-network
+
   load-tester:
     build: ./load-tester
     container_name: flask-ec-load-tester

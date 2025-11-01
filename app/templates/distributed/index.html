@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+
+{% block title %}分散トレーシングデモ - EC Shop{% endblock %}
+
+{% block content %}
+<div class="alert alert-info" role="alert">
+    <h4 class="alert-heading">🔗 分散トレーシングデモ</h4>
+    <p>このページは New Relic の<strong>分散トレーシング機能</strong>をデモするために、メインアプリケーションから別コンテナの分散サービスを呼び出します。</p>
+    <hr>
+    <p class="mb-0">各操作でuserIdがCustom Attributeとして設定され、分散システム全体のトレースが可視化されます。</p>
+</div>
+
+{% if not service_available %}
+<div class="alert alert-warning" role="alert">
+    <h5>⚠️ 分散サービス接続エラー</h5>
+    <p>分散サービスに接続できません。Docker Composeで分散サービスが起動していることを確認してください。</p>
+    {% if error %}
+    <p><strong>エラー詳細:</strong> {{ error }}</p>
+    {% endif %}
+</div>
+{% endif %}
+
+<h1>分散トレーシングデモ</h1>
+<p class="lead">以下のボタンをクリックすると、メインアプリケーションから分散サービスのパフォーマンス問題エンドポイントを呼び出します。</p>
+
+{% if current_user.is_authenticated %}
+<div class="alert alert-success">
+    <i class="fas fa-user"></i> ログイン中: <strong>{{ current_user.username }}</strong> (ID: {{ current_user.id }})
+    <br><small>このユーザーIDがCustom AttributeとしてNew Relicに送信されます</small>
+</div>
+{% endif %}
+
+<div class="row mt-4">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h5>🔄 N+1 クエリ問題</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>動作:</strong> 分散サービスでN+1クエリを実行</p>
+                <p><strong>New Relic で確認できること:</strong></p>
+                <ul>
+                    <li>メインアプリ → 分散サービスの分散トレース</li>
+                    <li>userIdのCustom Attribute</li>
+                    <li>分散サービスでの大量クエリ実行</li>
+                    <li>HTTP通信のレスポンス時間</li>
+                </ul>
+                
+                <div class="mb-3">
+                    <label for="nPlusOneLimit" class="form-label">商品数制限:</label>
+                    <input type="number" class="form-control" id="nPlusOneLimit" value="20" min="1" max="100">
+                </div>
+                
+                <button class="btn btn-warning" onclick="callNPlusOne()" {% if not service_available %}disabled{% endif %}>
+                    <i class="fas fa-database"></i> N+1クエリ実行
+                </button>
+                <div id="nPlusOneResult" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h5>🐌 スロークエリ</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>動作:</strong> 分散サービスで意図的に遅いクエリを実行</p>
+                <p><strong>New Relic で確認できること:</strong></p>
+                <ul>
+                    <li>分散トレースでの処理時間の内訳</li>
+                    <li>pg_sleepやCartesian Productの実行</li>
+                    <li>userIdを含むスロークエリの詳細</li>
+                    <li>データベースパフォーマンス問題</li>
+                </ul>
+                
+                <div class="mb-3">
+                    <label for="sleepDuration" class="form-label">スリープ時間 (秒):</label>
+                    <input type="number" class="form-control" id="sleepDuration" value="3.0" min="1" max="10" step="0.5">
+                </div>
+                
+                <div class="mb-3">
+                    <label for="queryType" class="form-label">クエリタイプ:</label>
+                    <select class="form-control" id="queryType">
+                        <option value="sleep">pg_sleep (シンプル遅延)</option>
+                        <option value="complex_join">複雑なJOIN</option>
+                        <option value="cartesian_product">Cartesian Product</option>
+                    </select>
+                </div>
+                
+                <button class="btn btn-danger" onclick="callSlowQuery()" {% if not service_available %}disabled{% endif %}>
+                    <i class="fas fa-clock"></i> スロークエリ実行
+                </button>
+                <div id="slowQueryResult" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5>💥 データベースエラー</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>動作:</strong> 分散サービスで意図的にデータベースエラーを発生</p>
+                <p><strong>New Relic で確認できること:</strong></p>
+                <ul>
+                    <li>分散トレースでのエラー発生箇所</li>
+                    <li>userIdを含むエラー詳細</li>
+                    <li>エラーの種類と原因</li>
+                    <li>分散システムでのエラー伝播</li>
+                </ul>
+                
+                <div class="mb-3">
+                    <label for="errorType" class="form-label">エラータイプ:</label>
+                    <select class="form-control" id="errorType">
+                        <option value="syntax">SQLシンタックスエラー</option>
+                        <option value="constraint">制約違反エラー</option>
+                        <option value="connection">接続エラー</option>
+                        <option value="timeout">タイムアウトエラー</option>
+                    </select>
+                </div>
+                
+                <button class="btn btn-danger" onclick="callDatabaseError()" {% if not service_available %}disabled{% endif %}>
+                    <i class="fas fa-exclamation-triangle"></i> エラー発生
+                </button>
+                <div id="databaseErrorResult" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5>🧪 全テスト実行</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>動作:</strong> 分散サービスで全パフォーマンステストを順次実行</p>
+                <p><strong>New Relic で確認できること:</strong></p>
+                <ul>
+                    <li>複数操作を含む長い分散トレース</li>
+                    <li>各操作のパフォーマンス比較</li>
+                    <li>userIdを含む包括的な実行ログ</li>
+                    <li>分散システム全体の処理フロー</li>
+                </ul>
+                
+                <button class="btn btn-primary" onclick="callTestAll()" {% if not service_available %}disabled{% endif %}>
+                    <i class="fas fa-play-circle"></i> 全テスト実行
+                </button>
+                <div id="testAllResult" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-info mt-4">
+    <h5>📊 New Relic での確認方法</h5>
+    <ol>
+        <li><strong>Distributed Tracing</strong>: メインアプリ → 分散サービスのトレースを確認</li>
+        <li><strong>Custom Attributes</strong>: userIdでフィルタリングして特定ユーザーの操作を追跡</li>
+        <li><strong>Service Map</strong>: サービス間の依存関係と通信パターンを可視化</li>
+        <li><strong>APM Overview</strong>: 各サービスのパフォーマンス指標を比較</li>
+        <li><strong>Errors Inbox</strong>: 分散システムでのエラー発生と伝播を確認</li>
+    </ol>
+</div>
+
+<div class="alert alert-warning mt-4">
+    <h5>🔧 トラブルシューティング</h5>
+    <p>分散サービスに接続できない場合:</p>
+    <ol>
+        <li><code>docker-compose ps</code> で分散サービスが起動していることを確認</li>
+        <li><code>docker-compose logs distributed-service</code> でログを確認</li>
+        <li>ネットワーク設定とポート5002が利用可能であることを確認</li>
+    </ol>
+    
+    <button class="btn btn-outline-info btn-sm" onclick="checkServiceHealth()">
+        <i class="fas fa-heartbeat"></i> サービス状態確認
+    </button>
+    <div id="healthCheckResult" class="mt-2"></div>
+</div>
+
+<div class="mt-4">
+    <a href="{{ url_for('main.index') }}" class="btn btn-outline-primary">← ホームに戻る</a>
+    <a href="{{ url_for('performance.index') }}" class="btn btn-outline-secondary">パフォーマンスデモ</a>
+</div>
+
+<script>
+// 共通のAJAX呼び出し関数
+function makeDistributedCall(endpoint, data, resultElementId) {
+    const resultElement = document.getElementById(resultElementId);
+    resultElement.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> 実行中...</div>';
+    
+    const startTime = Date.now();
+    
+    fetch(`/distributed/${endpoint}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => {
+        // 認証エラー（リダイレクト）をチェック
+        if (response.redirected || response.url.includes('/auth/login')) {
+            throw new Error('認証が必要です。ログインしてください。');
+        }
+        
+        // レスポンスがJSONかどうかをチェック
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            throw new Error('サーバーから予期しないレスポンス形式が返されました');
+        }
+        
+        return response.json();
+    })
+    .then(data => {
+        const executionTime = Date.now() - startTime;
+        
+        if (data.success) {
+            resultElement.innerHTML = `
+                <div class="alert alert-success">
+                    <h6><i class="fas fa-check-circle"></i> 実行成功</h6>
+                    <p><strong>メッセージ:</strong> ${data.message}</p>
+                    <p><strong>実行時間:</strong> ${executionTime}ms (クライアント側)</p>
+                    ${data.result && data.result.data ? `
+                        <details>
+                            <summary>詳細結果</summary>
+                            <pre class="mt-2">${JSON.stringify(data.result.data, null, 2)}</pre>
+                        </details>
+                    ` : ''}
+                </div>
+            `;
+        } else {
+            resultElement.innerHTML = `
+                <div class="alert alert-danger">
+                    <h6><i class="fas fa-exclamation-circle"></i> 実行エラー</h6>
+                    <p><strong>エラー:</strong> ${data.error}</p>
+                    <p><strong>実行時間:</strong> ${executionTime}ms</p>
+                    ${data.details ? `<p><strong>詳細:</strong> ${data.details}</p>` : ''}
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        const executionTime = Date.now() - startTime;
+        
+        let errorMessage = error.message;
+        let errorType = '通信エラー';
+        
+        if (error.message.includes('認証が必要')) {
+            errorType = '認証エラー';
+            errorMessage = 'ログインが必要です。ページを再読み込みしてログインしてください。';
+        } else if (error.message.includes('予期しないレスポンス')) {
+            errorType = 'レスポンスエラー';
+            errorMessage = 'サーバーからHTMLが返されました。認証状態を確認してください。';
+        }
+        
+        resultElement.innerHTML = `
+            <div class="alert alert-danger">
+                <h6><i class="fas fa-times-circle"></i> ${errorType}</h6>
+                <p><strong>エラー:</strong> ${errorMessage}</p>
+                <p><strong>実行時間:</strong> ${executionTime}ms</p>
+                ${error.message.includes('認証') ? `
+                    <button class="btn btn-sm btn-primary mt-2" onclick="window.location.reload()">
+                        <i class="fas fa-refresh"></i> ページを再読み込み
+                    </button>
+                ` : ''}
+            </div>
+        `;
+    });
+}
+
+// N+1クエリ実行
+function callNPlusOne() {
+    const limit = document.getElementById('nPlusOneLimit').value;
+    makeDistributedCall('n-plus-one', { limit: parseInt(limit) }, 'nPlusOneResult');
+}
+
+// スロークエリ実行
+function callSlowQuery() {
+    const sleepDuration = document.getElementById('sleepDuration').value;
+    const queryType = document.getElementById('queryType').value;
+    makeDistributedCall('slow-query', { 
+        sleep_duration: parseFloat(sleepDuration),
+        query_type: queryType
+    }, 'slowQueryResult');
+}
+
+// データベースエラー実行
+function callDatabaseError() {
+    const errorType = document.getElementById('errorType').value;
+    makeDistributedCall('database-error', { error_type: errorType }, 'databaseErrorResult');
+}
+
+// 全テスト実行
+function callTestAll() {
+    makeDistributedCall('test-all', {}, 'testAllResult');
+}
+
+// サービスヘルスチェック
+function checkServiceHealth() {
+    const resultElement = document.getElementById('healthCheckResult');
+    resultElement.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> 確認中...</div>';
+    
+    fetch('/distributed/health')
+    .then(response => response.json())
+    .then(data => {
+        if (data.distributed_service_available) {
+            resultElement.innerHTML = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i> 分散サービスは正常に動作しています
+                </div>
+            `;
+        } else {
+            resultElement.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-times-circle"></i> 分散サービスに接続できません
+                    ${data.error ? `<br><strong>エラー:</strong> ${data.error}` : ''}
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        resultElement.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-times-circle"></i> ヘルスチェックに失敗しました: ${error.message}
+            </div>
+        `;
+    });
+}
+</script>
+{% endblock %}
