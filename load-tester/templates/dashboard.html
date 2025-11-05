@@ -77,6 +77,28 @@
             width: 1rem;
             height: 1rem;
         }
+        .distributed-service-card {
+            border-left: 4px solid #17a2b8;
+        }
+        .distributed-service-card.connected {
+            border-left-color: #28a745;
+        }
+        .distributed-service-card.error {
+            border-left-color: #dc3545;
+        }
+        .test-result-card {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        .test-result-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .newrelic-status {
+            background: linear-gradient(135deg, #ff6b6b 0%, #4ecdc4 100%);
+            color: white;
+            border-radius: 10px;
+        }
     </style>
 </head>
 <body>
@@ -368,6 +390,11 @@
                             <i class="fas fa-users me-2"></i>User Management
                         </button>
                     </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="distributed-tab" data-bs-toggle="tab" data-bs-target="#distributed" type="button" role="tab">
+                            <i class="fas fa-network-wired me-2"></i>Distributed Service
+                        </button>
+                    </li>
                 </ul>
             </div>
         </div>
@@ -444,6 +471,169 @@
                                             <button class="btn btn-warning w-100" onclick="logoutAllUsers()">
                                                 <i class="fas fa-sign-out-alt me-2"></i>Logout All Users
                                             </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Distributed Service Tab -->
+                    <div class="tab-pane fade" id="distributed" role="tabpanel">
+                        <div class="row">
+                            <!-- Service Status -->
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h5 class="card-title mb-0"><i class="fas fa-server me-2"></i>Service Status</h5>
+                                        <button class="btn btn-sm btn-outline-secondary" onclick="refreshDistributedServiceStatus()">
+                                            <i class="fas fa-sync-alt me-1"></i>Refresh
+                                        </button>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="distributed-service-status">
+                                            <p class="text-muted">Loading service status...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- New Relic Integration -->
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h5 class="card-title mb-0"><i class="fas fa-chart-line me-2"></i>New Relic Integration</h5>
+                                        <button class="btn btn-sm btn-outline-secondary" onclick="refreshNewRelicStatus()">
+                                            <i class="fas fa-sync-alt me-1"></i>Refresh
+                                        </button>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="newrelic-integration-status">
+                                            <p class="text-muted">Loading New Relic status...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mt-4">
+                            <!-- Test Controls -->
+                            <div class="col-md-8">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="card-title mb-0"><i class="fas fa-play-circle me-2"></i>Distributed Service Tests</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <h6>Single Tests</h6>
+                                                <div class="btn-group-vertical w-100 mb-3" role="group">
+                                                    <button class="btn btn-outline-primary" onclick="runSingleTest('n-plus-one', 'direct')">
+                                                        <i class="fas fa-database me-2"></i>N+1 Query Test (Direct)
+                                                    </button>
+                                                    <button class="btn btn-outline-primary" onclick="runSingleTest('slow-query', 'direct')">
+                                                        <i class="fas fa-hourglass-half me-2"></i>Slow Query Test (Direct)
+                                                    </button>
+                                                    <button class="btn btn-outline-primary" onclick="runSingleTest('database-error', 'direct')">
+                                                        <i class="fas fa-exclamation-triangle me-2"></i>Database Error Test (Direct)
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <h6>Via Main App</h6>
+                                                <div class="btn-group-vertical w-100 mb-3" role="group">
+                                                    <button class="btn btn-outline-success" onclick="runSingleTest('n-plus-one', 'via_main_app')">
+                                                        <i class="fas fa-database me-2"></i>N+1 Query Test (Via App)
+                                                    </button>
+                                                    <button class="btn btn-outline-success" onclick="runSingleTest('slow-query', 'via_main_app')">
+                                                        <i class="fas fa-hourglass-half me-2"></i>Slow Query Test (Via App)
+                                                    </button>
+                                                    <button class="btn btn-outline-success" onclick="runSingleTest('database-error', 'via_main_app')">
+                                                        <i class="fas fa-exclamation-triangle me-2"></i>Database Error Test (Via App)
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <hr>
+
+                                        <h6>Load Test Scenarios</h6>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <button class="btn btn-warning w-100 mb-2" onclick="runLoadTestScenario('basic_distributed_tracing')">
+                                                    <i class="fas fa-play me-2"></i>Basic Distributed Tracing
+                                                </button>
+                                                <button class="btn btn-warning w-100 mb-2" onclick="runLoadTestScenario('n_plus_one_load_test')">
+                                                    <i class="fas fa-database me-2"></i>N+1 Query Load Test
+                                                </button>
+                                                <button class="btn btn-warning w-100 mb-2" onclick="runLoadTestScenario('slow_query_load_test')">
+                                                    <i class="fas fa-hourglass-half me-2"></i>Slow Query Load Test
+                                                </button>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <button class="btn btn-warning w-100 mb-2" onclick="runLoadTestScenario('database_error_test')">
+                                                    <i class="fas fa-exclamation-triangle me-2"></i>Database Error Test
+                                                </button>
+                                                <button class="btn btn-warning w-100 mb-2" onclick="runLoadTestScenario('concurrent_users_test')">
+                                                    <i class="fas fa-users me-2"></i>Concurrent Users Test
+                                                </button>
+                                                <button class="btn btn-warning w-100 mb-2" onclick="runLoadTestScenario('comprehensive_test')">
+                                                    <i class="fas fa-cogs me-2"></i>Comprehensive Test
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <hr>
+
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <button class="btn btn-info w-100" onclick="verifyNewRelicTraces()">
+                                                    <i class="fas fa-search me-2"></i>Verify New Relic Traces
+                                                </button>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <button class="btn btn-secondary w-100" onclick="showDistributedTestModal()">
+                                                    <i class="fas fa-cog me-2"></i>Custom Test Configuration
+                                                </button>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <button class="btn btn-primary w-100" onclick="showDistributedConfigModal()">
+                                                    <i class="fas fa-sliders-h me-2"></i>Configure Scenarios
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Test Results -->
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="card-title mb-0"><i class="fas fa-chart-bar me-2"></i>Test Results</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="distributed-test-results">
+                                            <p class="text-muted">No test results yet</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Distributed Service Metrics -->
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h5 class="card-title mb-0"><i class="fas fa-tachometer-alt me-2"></i>Distributed Service Metrics</h5>
+                                        <button class="btn btn-sm btn-outline-secondary" onclick="refreshDistributedMetrics()">
+                                            <i class="fas fa-sync-alt me-1"></i>Refresh
+                                        </button>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="distributed-service-metrics">
+                                            <p class="text-muted">Loading metrics...</p>
                                         </div>
                                     </div>
                                 </div>
@@ -752,6 +942,235 @@
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" onclick="addTestUser()">
                         <i class="fas fa-save me-2"></i>Add User
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Distributed Test Configuration Modal -->
+    <div class="modal fade" id="distributedTestModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-network-wired me-2"></i>Custom Distributed Service Test</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="distributed-test-form">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="dist-endpoint" class="form-label">Endpoint</label>
+                                    <select class="form-select" id="dist-endpoint" required>
+                                        <option value="n-plus-one">N+1 Query Problem</option>
+                                        <option value="slow-query">Slow Query</option>
+                                        <option value="database-error">Database Error</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="dist-call-type" class="form-label">Call Type</label>
+                                    <select class="form-select" id="dist-call-type" required>
+                                        <option value="direct">Direct to Distributed Service</option>
+                                        <option value="via_main_app">Via Main Application</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="dist-user-id" class="form-label">User ID</label>
+                                    <input type="number" class="form-control" id="dist-user-id" value="1" min="1" max="100" required>
+                                    <div class="form-text">Test user ID for Custom Attribute tracking</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="dist-timeout" class="form-label">Timeout (seconds)</label>
+                                    <input type="number" class="form-control" id="dist-timeout" value="30" min="5" max="300" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="dist-trace-headers" checked>
+                                <label class="form-check-label" for="dist-trace-headers">
+                                    Include distributed tracing headers (New Relic handles this automatically)
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="runCustomDistributedTest()">
+                        <i class="fas fa-play me-2"></i>Run Test
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Distributed Service Configuration Modal -->
+    <div class="modal fade" id="distributedConfigModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-sliders-h me-2"></i>Distributed Service Configuration</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs" id="configTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="scenarios-config-tab" data-bs-toggle="tab" data-bs-target="#scenarios-config" type="button" role="tab">
+                                <i class="fas fa-tasks me-2"></i>Test Scenarios
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="services-config-tab" data-bs-toggle="tab" data-bs-target="#services-config" type="button" role="tab">
+                                <i class="fas fa-server me-2"></i>Service URLs
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="newrelic-config-tab" data-bs-toggle="tab" data-bs-target="#newrelic-config" type="button" role="tab">
+                                <i class="fas fa-chart-line me-2"></i>New Relic
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content mt-3" id="configTabsContent">
+                        <!-- Test Scenarios Configuration -->
+                        <div class="tab-pane fade show active" id="scenarios-config" role="tabpanel">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Configure load test scenarios. Changes will be applied immediately to all scenario buttons.
+                            </div>
+                            <div id="scenarios-config-content">
+                                <p class="text-muted">Loading scenarios configuration...</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Service URLs Configuration -->
+                        <div class="tab-pane fade" id="services-config" role="tabpanel">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Configure service URLs and endpoint paths for distributed service testing.
+                            </div>
+                            <form id="services-config-form">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6><i class="fas fa-server me-2"></i>Distributed Service</h6>
+                                        <div class="mb-3">
+                                            <label for="dist-service-url" class="form-label">Base URL</label>
+                                            <input type="url" class="form-control" id="dist-service-url" placeholder="http://distributed-service:5000">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Endpoints</label>
+                                            <div class="row">
+                                                <div class="col-6">
+                                                    <label for="dist-n-plus-one-path" class="form-label small">N+1 Query</label>
+                                                    <input type="text" class="form-control form-control-sm" id="dist-n-plus-one-path" placeholder="/performance/n-plus-one">
+                                                </div>
+                                                <div class="col-6">
+                                                    <label for="dist-slow-query-path" class="form-label small">Slow Query</label>
+                                                    <input type="text" class="form-control form-control-sm" id="dist-slow-query-path" placeholder="/performance/slow-query">
+                                                </div>
+                                            </div>
+                                            <div class="row mt-2">
+                                                <div class="col-6">
+                                                    <label for="dist-db-error-path" class="form-label small">Database Error</label>
+                                                    <input type="text" class="form-control form-control-sm" id="dist-db-error-path" placeholder="/performance/database-error">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6><i class="fas fa-exchange-alt me-2"></i>Main Application</h6>
+                                        <div class="mb-3">
+                                            <label for="main-app-url" class="form-label">Base URL</label>
+                                            <input type="url" class="form-control" id="main-app-url" placeholder="http://web:5000">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Endpoints</label>
+                                            <div class="row">
+                                                <div class="col-6">
+                                                    <label for="main-n-plus-one-path" class="form-label small">N+1 Query</label>
+                                                    <input type="text" class="form-control form-control-sm" id="main-n-plus-one-path" placeholder="/distributed/n-plus-one">
+                                                </div>
+                                                <div class="col-6">
+                                                    <label for="main-slow-query-path" class="form-label small">Slow Query</label>
+                                                    <input type="text" class="form-control form-control-sm" id="main-slow-query-path" placeholder="/distributed/slow-query">
+                                                </div>
+                                            </div>
+                                            <div class="row mt-2">
+                                                <div class="col-6">
+                                                    <label for="main-db-error-path" class="form-label small">Database Error</label>
+                                                    <input type="text" class="form-control form-control-sm" id="main-db-error-path" placeholder="/distributed/database-error">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <!-- New Relic Configuration -->
+                        <div class="tab-pane fade" id="newrelic-config" role="tabpanel">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Configure New Relic integration for distributed tracing verification.
+                            </div>
+                            <form id="newrelic-config-form">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="newrelic-enabled">
+                                                <label class="form-check-label" for="newrelic-enabled">
+                                                    Enable New Relic Integration
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="newrelic-api-key" class="form-label">API Key</label>
+                                            <input type="password" class="form-control" id="newrelic-api-key" placeholder="Enter New Relic API Key">
+                                            <div class="form-text">Your New Relic API key for querying data</div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="newrelic-account-id" class="form-label">Account ID</label>
+                                            <input type="text" class="form-control" id="newrelic-account-id" placeholder="Enter New Relic Account ID">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="newrelic-app-names" class="form-label">Application Names</label>
+                                            <textarea class="form-control" id="newrelic-app-names" rows="3" placeholder="Flask-EC-Main-App&#10;Flask-EC-Distributed-Service"></textarea>
+                                            <div class="form-text">One application name per line</div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="newrelic-timeout" class="form-label">Verification Timeout (seconds)</label>
+                                            <input type="number" class="form-control" id="newrelic-timeout" value="300" min="30" max="600">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="newrelic-retry-attempts" class="form-label">Retry Attempts</label>
+                                            <input type="number" class="form-control" id="newrelic-retry-attempts" value="3" min="1" max="10">
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-info" onclick="loadDistributedConfig()">
+                        <i class="fas fa-sync-alt me-2"></i>Reload
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="saveDistributedConfig()">
+                        <i class="fas fa-save me-2"></i>Save Configuration
                     </button>
                 </div>
             </div>
@@ -2639,7 +3058,802 @@
             }
         }
 
-        // Initialize scheduling and user management on page load
+        // 分散サービステスト関数
+        async function refreshDistributedServiceStatus() {
+            try {
+                const response = await fetch('/api/distributed-service/status');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayDistributedServiceStatus(data);
+                } else {
+                    document.getElementById('distributed-service-status').innerHTML = 
+                        '<p class="text-danger">Failed to load service status</p>';
+                }
+                
+            } catch (error) {
+                console.error('Error loading distributed service status:', error);
+                document.getElementById('distributed-service-status').innerHTML = 
+                    '<p class="text-danger">Error loading service status</p>';
+            }
+        }
+
+        function displayDistributedServiceStatus(data) {
+            const container = document.getElementById('distributed-service-status');
+            
+            let html = '<div class="row">';
+            
+            // 分散サービス状態
+            const distService = data.distributed_service;
+            const distStatusClass = distService.status === 'connected' ? 'success' : 'danger';
+            const distStatusIcon = distService.status === 'connected' ? 'check-circle' : 'times-circle';
+            
+            html += `
+                <div class="col-12 mb-3">
+                    <h6><i class="fas fa-server me-2"></i>Distributed Service</h6>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>${distService.url}</span>
+                        <span class="badge bg-${distStatusClass}">
+                            <i class="fas fa-${distStatusIcon} me-1"></i>${distService.status}
+                        </span>
+                    </div>
+                    ${distService.last_response_time ? 
+                        `<small class="text-muted">Response Time: ${Math.round(distService.last_response_time)}ms</small>` : ''}
+                    ${distService.error ? `<div class="text-danger small mt-1">${distService.error}</div>` : ''}
+                </div>
+            `;
+            
+            // メインアプリケーション経由の状態
+            const mainApp = data.main_app_distributed;
+            const mainStatusClass = mainApp.status === 'connected' ? 'success' : 'danger';
+            const mainStatusIcon = mainApp.status === 'connected' ? 'check-circle' : 'times-circle';
+            
+            html += `
+                <div class="col-12">
+                    <h6><i class="fas fa-exchange-alt me-2"></i>Via Main Application</h6>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>${mainApp.url}</span>
+                        <span class="badge bg-${mainStatusClass}">
+                            <i class="fas fa-${mainStatusIcon} me-1"></i>${mainApp.status}
+                        </span>
+                    </div>
+                    ${mainApp.last_response_time ? 
+                        `<small class="text-muted">Response Time: ${Math.round(mainApp.last_response_time)}ms</small>` : ''}
+                    ${mainApp.error ? `<div class="text-danger small mt-1">${mainApp.error}</div>` : ''}
+                </div>
+            `;
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        async function refreshNewRelicStatus() {
+            try {
+                const response = await fetch('/api/distributed-service/newrelic-status');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayNewRelicStatus(data);
+                } else {
+                    document.getElementById('newrelic-integration-status').innerHTML = 
+                        '<p class="text-danger">Failed to load New Relic status</p>';
+                }
+                
+            } catch (error) {
+                console.error('Error loading New Relic status:', error);
+                document.getElementById('newrelic-integration-status').innerHTML = 
+                    '<p class="text-danger">Error loading New Relic status</p>';
+            }
+        }
+
+        function displayNewRelicStatus(data) {
+            const container = document.getElementById('newrelic-integration-status');
+            
+            const enabledBadge = data.enabled ? 
+                '<span class="badge bg-success">Enabled</span>' : 
+                '<span class="badge bg-secondary">Disabled</span>';
+            
+            const verificationBadge = data.verification_available ? 
+                '<span class="badge bg-success">Available</span>' : 
+                '<span class="badge bg-warning">Not Available</span>';
+            
+            let html = `
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span><strong>Integration Status:</strong></span>
+                        ${enabledBadge}
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span><strong>Verification:</strong></span>
+                        ${verificationBadge}
+                    </div>
+                </div>
+                
+                <div class="small">
+                    <div class="mb-1">
+                        <strong>API Key:</strong> ${data.api_key_configured ? 'Configured' : 'Not configured'}
+                    </div>
+                    <div class="mb-1">
+                        <strong>Account ID:</strong> ${data.account_id_configured ? 'Configured' : 'Not configured'}
+                    </div>
+                    <div class="mb-1">
+                        <strong>Applications:</strong> ${data.app_names.join(', ') || 'None'}
+                    </div>
+                    ${data.error ? `<div class="text-danger mt-2">${data.error}</div>` : ''}
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        }
+
+        async function runSingleTest(endpoint, callType) {
+            try {
+                showAlert(`Running ${endpoint} test (${callType})...`, 'info');
+                
+                const requestData = {
+                    endpoint: endpoint,
+                    user_id: Math.floor(Math.random() * 100) + 1, // ランダムなユーザーID
+                    call_type: callType,
+                    timeout: 30
+                };
+                
+                const response = await fetch('/api/distributed-service/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    displayTestResult(result);
+                    showAlert(`${endpoint} test completed successfully!`, 'success');
+                } else {
+                    showAlert(result.detail || `Failed to run ${endpoint} test`, 'danger');
+                }
+                
+            } catch (error) {
+                console.error(`Error running ${endpoint} test:`, error);
+                showAlert(`Error running ${endpoint} test`, 'danger');
+            }
+        }
+
+        async function runLoadTestScenario(scenario) {
+            try {
+                // 実行中状態を表示
+                showLoadTestProgress(scenario, 'starting');
+                showAlert(`Starting ${scenario} load test scenario...`, 'info');
+                
+                const requestData = {
+                    test_scenario: scenario
+                };
+                
+                const response = await fetch('/api/distributed-service/load-test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showLoadTestProgress(scenario, 'completed');
+                    displayLoadTestResult(result);
+                    showAlert(`${scenario} load test completed successfully!`, 'success');
+                } else {
+                    showLoadTestProgress(scenario, 'failed');
+                    showAlert(result.detail || `Failed to run ${scenario} load test`, 'danger');
+                }
+                
+            } catch (error) {
+                console.error(`Error running ${scenario} load test:`, error);
+                showLoadTestProgress(scenario, 'failed');
+                showAlert(`Error running ${scenario} load test`, 'danger');
+            }
+        }
+
+        function showLoadTestProgress(scenario, status) {
+            const container = document.getElementById('distributed-test-results');
+            const progressId = `progress-${scenario}`;
+            
+            // 既存の進行状況表示を削除
+            const existingProgress = document.getElementById(progressId);
+            if (existingProgress) {
+                existingProgress.remove();
+            }
+            
+            if (status === 'starting') {
+                const html = `
+                    <div id="${progressId}" class="border rounded p-3 mb-3 bg-warning text-dark">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">
+                                <i class="fas fa-spinner fa-spin me-2"></i>
+                                Load Test: ${scenario.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </h6>
+                            <span class="badge bg-primary">
+                                <i class="fas fa-clock me-1"></i>Running
+                            </span>
+                        </div>
+                        <div class="small">
+                            <div class="progress mb-2">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     role="progressbar" style="width: 100%"></div>
+                            </div>
+                            <div>Load test is running... Please wait for completion.</div>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML = html + container.innerHTML;
+            } else if (status === 'completed') {
+                const progressElement = document.getElementById(progressId);
+                if (progressElement) {
+                    progressElement.className = 'border rounded p-3 mb-3 bg-success text-white';
+                    progressElement.querySelector('.badge').innerHTML = '<i class="fas fa-check me-1"></i>Completed';
+                    progressElement.querySelector('.fas.fa-spinner').className = 'fas fa-check me-2';
+                    progressElement.querySelector('.progress').innerHTML = '<div class="progress-bar bg-success" style="width: 100%"></div>';
+                    
+                    // 3秒後に削除
+                    setTimeout(() => {
+                        if (progressElement.parentNode) {
+                            progressElement.remove();
+                        }
+                    }, 3000);
+                }
+            } else if (status === 'failed') {
+                const progressElement = document.getElementById(progressId);
+                if (progressElement) {
+                    progressElement.className = 'border rounded p-3 mb-3 bg-danger text-white';
+                    progressElement.querySelector('.badge').innerHTML = '<i class="fas fa-times me-1"></i>Failed';
+                    progressElement.querySelector('.fas.fa-spinner').className = 'fas fa-times me-2';
+                    progressElement.querySelector('.progress').innerHTML = '<div class="progress-bar bg-danger" style="width: 100%"></div>';
+                    
+                    // 5秒後に削除
+                    setTimeout(() => {
+                        if (progressElement.parentNode) {
+                            progressElement.remove();
+                        }
+                    }, 5000);
+                }
+            }
+        }
+
+        function displayTestResult(result) {
+            const container = document.getElementById('distributed-test-results');
+            const testResult = result.test_result;
+            
+            const statusClass = testResult.status === 'success' ? 'success' : 'danger';
+            const statusIcon = testResult.status === 'success' ? 'check-circle' : 'times-circle';
+            
+            const html = `
+                <div class="border rounded p-3 mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">${result.endpoint} (${result.call_type})</h6>
+                        <span class="badge bg-${statusClass}">
+                            <i class="fas fa-${statusIcon} me-1"></i>${testResult.status}
+                        </span>
+                    </div>
+                    <div class="small">
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>User ID:</strong> ${result.user_id}
+                            </div>
+                            <div class="col-6">
+                                <strong>Response Time:</strong> ${Math.round(testResult.response_time)}ms
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>Status Code:</strong> ${testResult.status_code || 'N/A'}
+                            </div>
+                            <div class="col-6">
+                                <strong>Timestamp:</strong> ${new Date(result.timestamp).toLocaleTimeString()}
+                            </div>
+                        </div>
+                        ${testResult.error ? `<div class="text-danger mt-2"><strong>Error:</strong> ${testResult.error}</div>` : ''}
+                        ${testResult.data ? `<div class="mt-2"><strong>Data:</strong> ${JSON.stringify(testResult.data, null, 2)}</div>` : ''}
+                    </div>
+                </div>
+            `;
+            
+            container.innerHTML = html + container.innerHTML;
+        }
+
+        function displayLoadTestResult(result) {
+            const container = document.getElementById('distributed-test-results');
+            
+            // 結果の詳細を解析
+            const scenarioResult = result.result || {};
+            const stats = scenarioResult.statistics || {};
+            const traceInfo = scenarioResult.trace_info || {};
+            
+            const html = `
+                <div class="border rounded p-3 mb-3 bg-light">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">Load Test: ${result.scenario.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</h6>
+                        <span class="badge bg-success">
+                            <i class="fas fa-check me-1"></i>Completed
+                        </span>
+                    </div>
+                    <div class="small">
+                        <div class="row mb-2">
+                            <div class="col-3">
+                                <strong>Users:</strong> ${result.config.concurrent_users}
+                            </div>
+                            <div class="col-3">
+                                <strong>Duration:</strong> ${result.config.duration_minutes}m
+                            </div>
+                            <div class="col-3">
+                                <strong>Call Type:</strong> ${result.config.call_type}
+                            </div>
+                            <div class="col-3">
+                                <strong>Completed:</strong> ${new Date(result.timestamp).toLocaleTimeString()}
+                            </div>
+                        </div>
+                        
+                        ${stats.total_requests ? `
+                        <div class="row mb-2">
+                            <div class="col-12">
+                                <strong>Statistics:</strong>
+                            </div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-3">
+                                <span class="badge bg-primary">${stats.total_requests} Total</span>
+                            </div>
+                            <div class="col-3">
+                                <span class="badge bg-success">${stats.successful_requests || 0} Success</span>
+                            </div>
+                            <div class="col-3">
+                                <span class="badge bg-danger">${stats.failed_requests || 0} Failed</span>
+                            </div>
+                            <div class="col-3">
+                                <span class="badge bg-info">${Math.round(stats.success_rate || 0)}% Rate</span>
+                            </div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-6">
+                                <strong>Avg Response:</strong> ${Math.round(stats.average_response_time || 0)}ms
+                            </div>
+                            <div class="col-6">
+                                <strong>Duration:</strong> ${Math.round(stats.duration_seconds || 0)}s
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        ${traceInfo.distributed_traces_found ? `
+                        <div class="row mb-2">
+                            <div class="col-12">
+                                <div class="alert alert-success alert-sm py-1 mb-1">
+                                    <i class="fas fa-check-circle me-1"></i>
+                                    <strong>Distributed Tracing:</strong> ${traceInfo.distributed_traces_found} traces found
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        ${scenarioResult.error ? `
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="alert alert-danger alert-sm py-1 mb-0">
+                                    <strong>Error:</strong> ${scenarioResult.error}
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+            
+            container.innerHTML = html + container.innerHTML;
+        }
+
+        async function verifyNewRelicTraces() {
+            try {
+                showAlert('Verifying New Relic distributed traces...', 'info');
+                
+                const response = await fetch('/api/distributed-service/verify-newrelic', {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    displayVerificationResult(result);
+                    showAlert('New Relic verification completed!', 'success');
+                } else {
+                    showAlert(result.detail || 'Failed to verify New Relic traces', 'danger');
+                }
+                
+            } catch (error) {
+                console.error('Error verifying New Relic traces:', error);
+                showAlert('Error verifying New Relic traces', 'danger');
+            }
+        }
+
+        function displayVerificationResult(result) {
+            const container = document.getElementById('distributed-test-results');
+            
+            const html = `
+                <div class="border rounded p-3 mb-3 bg-info text-white">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">New Relic Verification</h6>
+                        <span class="badge bg-light text-dark">
+                            <i class="fas fa-search me-1"></i>Verification
+                        </span>
+                    </div>
+                    <div class="small">
+                        <div><strong>Timestamp:</strong> ${new Date(result.timestamp).toLocaleString()}</div>
+                        <div class="mt-2"><strong>Results:</strong></div>
+                        <pre class="mt-1 text-white">${JSON.stringify(result.verification_result, null, 2)}</pre>
+                    </div>
+                </div>
+            `;
+            
+            container.innerHTML = html + container.innerHTML;
+        }
+
+        function showDistributedTestModal() {
+            const modal = new bootstrap.Modal(document.getElementById('distributedTestModal'));
+            modal.show();
+        }
+
+        async function runCustomDistributedTest() {
+            try {
+                const requestData = {
+                    endpoint: document.getElementById('dist-endpoint').value,
+                    user_id: parseInt(document.getElementById('dist-user-id').value),
+                    call_type: document.getElementById('dist-call-type').value,
+                    timeout: parseInt(document.getElementById('dist-timeout').value)
+                };
+                
+                showAlert(`Running custom ${requestData.endpoint} test...`, 'info');
+                
+                const response = await fetch('/api/distributed-service/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    displayTestResult(result);
+                    showAlert('Custom test completed successfully!', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('distributedTestModal')).hide();
+                } else {
+                    showAlert(result.detail || 'Failed to run custom test', 'danger');
+                }
+                
+            } catch (error) {
+                console.error('Error running custom test:', error);
+                showAlert('Error running custom test', 'danger');
+            }
+        }
+
+        async function refreshDistributedMetrics() {
+            try {
+                const response = await fetch('/api/distributed-service/metrics');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayDistributedMetrics(data);
+                } else {
+                    document.getElementById('distributed-service-metrics').innerHTML = 
+                        '<p class="text-danger">Failed to load metrics</p>';
+                }
+                
+            } catch (error) {
+                console.error('Error loading distributed metrics:', error);
+                document.getElementById('distributed-service-metrics').innerHTML = 
+                    '<p class="text-danger">Error loading metrics</p>';
+            }
+        }
+
+        function displayDistributedMetrics(data) {
+            const container = document.getElementById('distributed-service-metrics');
+            
+            let html = '<div class="row">';
+            
+            // サービスURL
+            html += `
+                <div class="col-md-6">
+                    <h6><i class="fas fa-link me-2"></i>Service URLs</h6>
+                    <div class="small">
+                        <div class="mb-1"><strong>Distributed Service:</strong> ${data.service_urls.distributed_service}</div>
+                        <div class="mb-1"><strong>Main App Distributed:</strong> ${data.service_urls.main_app_distributed}</div>
+                    </div>
+                </div>
+            `;
+            
+            // 利用可能なエンドポイント
+            html += `
+                <div class="col-md-6">
+                    <h6><i class="fas fa-list me-2"></i>Available Endpoints</h6>
+                    <div class="small">
+                        <div class="mb-2">
+                            <strong>Distributed Service:</strong>
+                            <ul class="mb-1">
+                                ${Object.entries(data.available_endpoints.distributed_service).map(([name, path]) => 
+                                    `<li>${name}: ${path}</li>`
+                                ).join('')}
+                            </ul>
+                        </div>
+                        <div>
+                            <strong>Main App:</strong>
+                            <ul class="mb-1">
+                                ${Object.entries(data.available_endpoints.main_app_distributed).map(([name, path]) => 
+                                    `<li>${name}: ${path}</li>`
+                                ).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            html += '</div><div class="row mt-3">';
+            
+            // テストシナリオ
+            html += `
+                <div class="col-md-6">
+                    <h6><i class="fas fa-tasks me-2"></i>Test Scenarios</h6>
+                    <div class="small">
+                        ${data.test_scenarios.map(scenario => `<span class="badge bg-secondary me-1 mb-1">${scenario}</span>`).join('')}
+                    </div>
+                </div>
+            `;
+            
+            // New Relic統合
+            html += `
+                <div class="col-md-6">
+                    <h6><i class="fas fa-chart-line me-2"></i>New Relic Integration</h6>
+                    <div class="small">
+                        <div class="mb-1">
+                            <strong>Enabled:</strong> 
+                            <span class="badge ${data.newrelic_integration.enabled ? 'bg-success' : 'bg-secondary'}">
+                                ${data.newrelic_integration.enabled ? 'Yes' : 'No'}
+                            </span>
+                        </div>
+                        <div class="mb-1"><strong>Applications:</strong> ${data.newrelic_integration.app_names.join(', ') || 'None'}</div>
+                    </div>
+                </div>
+            `;
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        // 分散サービス設定関数
+        function showDistributedConfigModal() {
+            loadDistributedConfig();
+            const modal = new bootstrap.Modal(document.getElementById('distributedConfigModal'));
+            modal.show();
+        }
+
+        async function loadDistributedConfig() {
+            try {
+                // 基本設定を読み込み
+                const configResponse = await fetch('/api/distributed-service/config');
+                const configData = await configResponse.json();
+                
+                if (configResponse.ok) {
+                    populateServicesConfig(configData);
+                    populateNewRelicConfig(configData.newrelic_verification);
+                }
+                
+                // シナリオ設定を読み込み
+                const scenariosResponse = await fetch('/api/distributed-service/config/scenarios');
+                const scenariosData = await scenariosResponse.json();
+                
+                if (scenariosResponse.ok) {
+                    populateScenariosConfig(scenariosData.test_scenarios);
+                }
+                
+            } catch (error) {
+                console.error('Error loading distributed config:', error);
+                showAlert('Error loading configuration', 'danger');
+            }
+        }
+
+        function populateServicesConfig(data) {
+            const distService = data.distributed_service || {};
+            const mainApp = data.main_app_distributed || {};
+            
+            // 分散サービス設定
+            document.getElementById('dist-service-url').value = distService.base_url || '';
+            
+            const distEndpoints = distService.endpoints || {};
+            document.getElementById('dist-n-plus-one-path').value = distEndpoints['n-plus-one'] || '';
+            document.getElementById('dist-slow-query-path').value = distEndpoints['slow-query'] || '';
+            document.getElementById('dist-db-error-path').value = distEndpoints['database-error'] || '';
+            
+            // メインアプリケーション設定
+            document.getElementById('main-app-url').value = mainApp.base_url || '';
+            
+            const mainEndpoints = mainApp.endpoints || {};
+            document.getElementById('main-n-plus-one-path').value = mainEndpoints['distributed-n-plus-one'] || '';
+            document.getElementById('main-slow-query-path').value = mainEndpoints['distributed-slow-query'] || '';
+            document.getElementById('main-db-error-path').value = mainEndpoints['distributed-database-error'] || '';
+        }
+
+        function populateNewRelicConfig(data) {
+            const newrelic = data || {};
+            
+            document.getElementById('newrelic-enabled').checked = newrelic.enabled || false;
+            document.getElementById('newrelic-api-key').value = newrelic.api_key || '';
+            document.getElementById('newrelic-account-id').value = newrelic.account_id || '';
+            document.getElementById('newrelic-app-names').value = (newrelic.app_names || []).join('\n');
+            document.getElementById('newrelic-timeout').value = newrelic.verification_timeout_seconds || 300;
+            document.getElementById('newrelic-retry-attempts').value = newrelic.retry_attempts || 3;
+        }
+
+        function populateScenariosConfig(scenarios) {
+            const container = document.getElementById('scenarios-config-content');
+            
+            if (!scenarios || Object.keys(scenarios).length === 0) {
+                container.innerHTML = '<p class="text-muted">No scenarios configured</p>';
+                return;
+            }
+            
+            let html = '';
+            
+            Object.entries(scenarios).forEach(([scenarioName, config]) => {
+                html += `
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">${scenarioName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="scenario-${scenarioName}-users" class="form-label small">Concurrent Users</label>
+                                    <input type="number" class="form-control form-control-sm" id="scenario-${scenarioName}-users" 
+                                           value="${config.concurrent_users || 10}" min="1" max="50">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="scenario-${scenarioName}-duration" class="form-label small">Duration (minutes)</label>
+                                    <input type="number" class="form-control form-control-sm" id="scenario-${scenarioName}-duration" 
+                                           value="${config.duration_minutes || 5}" min="1" max="60">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="scenario-${scenarioName}-rampup" class="form-label small">Ramp Up (seconds)</label>
+                                    <input type="number" class="form-control form-control-sm" id="scenario-${scenarioName}-rampup" 
+                                           value="${config.ramp_up_seconds || 30}" min="0" max="300">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="scenario-${scenarioName}-calltype" class="form-label small">Call Type</label>
+                                    <select class="form-select form-select-sm" id="scenario-${scenarioName}-calltype">
+                                        <option value="direct" ${config.call_type === 'direct' ? 'selected' : ''}>Direct</option>
+                                        <option value="via_main_app" ${config.call_type === 'via_main_app' ? 'selected' : ''}>Via Main App</option>
+                                        <option value="both" ${config.call_type === 'both' ? 'selected' : ''}>Both</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-md-3">
+                                    <label for="scenario-${scenarioName}-interval-min" class="form-label small">Min Interval (s)</label>
+                                    <input type="number" class="form-control form-control-sm" id="scenario-${scenarioName}-interval-min" 
+                                           value="${config.request_interval_min || 1.0}" min="0.1" step="0.1">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="scenario-${scenarioName}-interval-max" class="form-label small">Max Interval (s)</label>
+                                    <input type="number" class="form-control form-control-sm" id="scenario-${scenarioName}-interval-max" 
+                                           value="${config.request_interval_max || 3.0}" min="0.1" step="0.1">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="scenario-${scenarioName}-timeout" class="form-label small">Timeout (s)</label>
+                                    <input type="number" class="form-control form-control-sm" id="scenario-${scenarioName}-timeout" 
+                                           value="${config.timeout_seconds || 30}" min="5" max="300">
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check mt-4">
+                                        <input class="form-check-input" type="checkbox" id="scenario-${scenarioName}-tracing" 
+                                               ${config.include_trace_headers !== false ? 'checked' : ''}>
+                                        <label class="form-check-label small" for="scenario-${scenarioName}-tracing">
+                                            Include Tracing
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        async function saveDistributedConfig() {
+            try {
+                // サービス設定を収集
+                const servicesConfig = {
+                    distributed_service: {
+                        base_url: document.getElementById('dist-service-url').value,
+                        endpoints: {
+                            'n-plus-one': document.getElementById('dist-n-plus-one-path').value,
+                            'slow-query': document.getElementById('dist-slow-query-path').value,
+                            'database-error': document.getElementById('dist-db-error-path').value
+                        }
+                    },
+                    main_app_distributed: {
+                        base_url: document.getElementById('main-app-url').value,
+                        endpoints: {
+                            'distributed-n-plus-one': document.getElementById('main-n-plus-one-path').value,
+                            'distributed-slow-query': document.getElementById('main-slow-query-path').value,
+                            'distributed-database-error': document.getElementById('main-db-error-path').value
+                        }
+                    },
+                    newrelic_verification: {
+                        enabled: document.getElementById('newrelic-enabled').checked,
+                        api_key: document.getElementById('newrelic-api-key').value,
+                        account_id: document.getElementById('newrelic-account-id').value,
+                        app_names: document.getElementById('newrelic-app-names').value.split('\n').filter(name => name.trim()),
+                        verification_timeout_seconds: parseInt(document.getElementById('newrelic-timeout').value),
+                        retry_attempts: parseInt(document.getElementById('newrelic-retry-attempts').value)
+                    }
+                };
+                
+                // シナリオ設定を収集
+                const scenarios = {};
+                const scenarioElements = document.querySelectorAll('[id^="scenario-"][id$="-users"]');
+                
+                scenarioElements.forEach(element => {
+                    const scenarioName = element.id.replace('scenario-', '').replace('-users', '');
+                    scenarios[scenarioName] = {
+                        concurrent_users: parseInt(document.getElementById(`scenario-${scenarioName}-users`).value),
+                        duration_minutes: parseInt(document.getElementById(`scenario-${scenarioName}-duration`).value),
+                        ramp_up_seconds: parseInt(document.getElementById(`scenario-${scenarioName}-rampup`).value),
+                        call_type: document.getElementById(`scenario-${scenarioName}-calltype`).value,
+                        request_interval_min: parseFloat(document.getElementById(`scenario-${scenarioName}-interval-min`).value),
+                        request_interval_max: parseFloat(document.getElementById(`scenario-${scenarioName}-interval-max`).value),
+                        timeout_seconds: parseInt(document.getElementById(`scenario-${scenarioName}-timeout`).value),
+                        include_trace_headers: document.getElementById(`scenario-${scenarioName}-tracing`).checked
+                    };
+                });
+                
+                // サービス設定を保存
+                const servicesResponse = await fetch('/api/distributed-service/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(servicesConfig)
+                });
+                
+                // シナリオ設定を保存
+                const scenariosResponse = await fetch('/api/distributed-service/config/scenarios', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ test_scenarios: scenarios })
+                });
+                
+                if (servicesResponse.ok && scenariosResponse.ok) {
+                    showAlert('Distributed service configuration saved successfully!', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('distributedConfigModal')).hide();
+                    
+                    // メトリクスを更新
+                    refreshDistributedMetrics();
+                    refreshDistributedServiceStatus();
+                } else {
+                    const servicesResult = await servicesResponse.json();
+                    const scenariosResult = await scenariosResponse.json();
+                    showAlert('Failed to save configuration: ' + (servicesResult.detail || scenariosResult.detail), 'danger');
+                }
+                
+            } catch (error) {
+                console.error('Error saving distributed config:', error);
+                showAlert('Error saving configuration', 'danger');
+            }
+        }
+
+        // Initialize scheduling, user management, and distributed service on page load
         document.addEventListener('DOMContentLoaded', function() {
             // Add scheduling tab functionality
             const schedulingTab = document.querySelector('[data-bs-target="#scheduling"]');
@@ -2655,6 +3869,16 @@
                 usersTab.addEventListener('shown.bs.tab', function() {
                     loadTestUsers();
                     loadUserSessions();
+                });
+            }
+            
+            // Add distributed service tab functionality
+            const distributedTab = document.querySelector('[data-bs-target="#distributed"]');
+            if (distributedTab) {
+                distributedTab.addEventListener('shown.bs.tab', function() {
+                    refreshDistributedServiceStatus();
+                    refreshNewRelicStatus();
+                    refreshDistributedMetrics();
                 });
             }
         });

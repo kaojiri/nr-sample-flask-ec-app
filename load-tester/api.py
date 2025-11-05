@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
 import logging
+from datetime import datetime
 
 from config import config_manager
 from endpoint_selector import endpoint_selector
@@ -1507,3 +1508,519 @@ async def cleanup_users(request: CleanupRequest):
             "error": f"クリーンアップ処理エラー: {str(e)}",
             "timestamp": datetime.utcnow().isoformat()
         }
+
+# 分散サービステスト API エンドポイント
+
+class DistributedTestRequest(BaseModel):
+    """分散サービステストリクエストモデル"""
+    endpoint: str = Field(..., description="テストするエンドポイント (n-plus-one, slow-query, database-error)")
+    user_id: int = Field(..., description="テスト用ユーザーID")
+    call_type: str = Field(default="direct", description="呼び出しタイプ (direct, via_main_app)")
+    parameters: Optional[Dict[str, Any]] = Field(default=None, description="追加パラメータ")
+    timeout: Optional[int] = Field(default=30, description="タイムアウト時間（秒）")
+
+class DistributedLoadTestRequest(BaseModel):
+    """分散サービス負荷テストリクエストモデル"""
+    test_scenario: str = Field(..., description="テストシナリオ名")
+    concurrent_users: Optional[int] = Field(default=None, description="同時実行ユーザー数")
+    duration_minutes: Optional[int] = Field(default=None, description="実行時間（分）")
+    call_type: Optional[str] = Field(default=None, description="呼び出しタイプ")
+
+@router.get("/distributed-service/status")
+async def get_distributed_service_status():
+    """分散サービスの状態を取得"""
+    try:
+        from distributed_service_client import DistributedServiceTestClient
+        from config import config_manager
+        import aiohttp
+        import time
+        
+        config = config_manager.get_config()
+        distributed_service_url = config.get("distributed_service", {}).get("base_url", "http://distributed-service:5000")
+        main_app_url = config.get("main_app_distributed", {}).get("base_url", "http://web:5000")
+        
+        # 各エンドポイントの基本的な接続テスト
+        status = {
+            "distributed_service": {
+                "url": distributed_service_url,
+                "status": "unknown",
+                "endpoints": {}
+            },
+            "main_app_distributed": {
+                "url": main_app_url,
+                "status": "unknown",
+                "endpoints": {}
+            }
+        }
+        
+        # 分散サービスの接続テスト
+        try:
+            start_time = time.time()
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as session:
+                async with session.post(
+                    f"{distributed_service_url}/performance/n-plus-one",
+                    json={"user_id": 1, "operation": "n-plus-one"},
+                    headers={"Content-Type": "application/json"}
+                ) as response:
+                    response_time = (time.time() - start_time) * 1000
+                    if response.status == 200:
+                        status["distributed_service"]["status"] = "connected"
+                        status["distributed_service"]["last_response_time"] = response_time
+                    else:
+                        status["distributed_service"]["status"] = "error"
+                        status["distributed_service"]["error"] = f"HTTP {response.status}"
+                        status["distributed_service"]["last_response_time"] = response_time
+        except Exception as e:
+            status["distributed_service"]["status"] = "error"
+            status["distributed_service"]["error"] = str(e)
+        
+        # メインアプリケーション経由の接続テスト
+        try:
+            start_time = time.time()
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as session:
+                async with session.post(
+                    f"{main_app_url}/distributed/n-plus-one",
+                    json={"user_id": 1, "operation": "n-plus-one"},
+                    headers={"Content-Type": "application/json"}
+                ) as response:
+                    response_time = (time.time() - start_time) * 1000
+                    # 302リダイレクトも成功とみなす（認証が必要な場合）
+                    if response.status in [200, 302]:
+                        status["main_app_distributed"]["status"] = "connected"
+                        status["main_app_distributed"]["last_response_time"] = response_time
+                    else:
+                        status["main_app_distributed"]["status"] = "error"
+                        status["main_app_distributed"]["error"] = f"HTTP {response.status}"
+                        status["main_app_distributed"]["last_response_time"] = response_time
+        except Exception as e:
+            status["main_app_distributed"]["status"] = "error"
+            status["main_app_distributed"]["error"] = str(e)
+        
+        return status
+        
+    except Exception as e:
+        logger.error(f"Error getting distributed service status: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get distributed service status")
+
+@router.post("/distributed-service/test")
+async def run_distributed_service_test(request: DistributedTestRequest):
+    """分散サービスの単発テストを実行"""
+    try:
+        from config import config_manager
+        import aiohttp
+        import time
+        
+        config = config_manager.get_config()
+        
+        # URL構築
+        if request.call_type == "direct":
+            base_url = config.get("distributed_service", {}).get("base_url", "http://distributed-service:5000")
+            endpoint_path = config.get("distributed_service", {}).get("endpoints", {}).get(
+                request.endpoint, f"/performance/{request.endpoint}"
+            )
+        elif request.call_type == "via_main_app":
+            base_url = config.get("main_app_distributed", {}).get("base_url", "http://web:5000")
+            endpoint_key = f"distributed-{request.endpoint}"
+            endpoint_path = config.get("main_app_distributed", {}).get("endpoints", {}).get(
+                endpoint_key, f"/distributed/{request.endpoint}"
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Invalid call_type. Use 'direct' or 'via_main_app'")
+        
+        url = f"{base_url}{endpoint_path}"
+        
+        # リクエストデータ
+        data = {
+            "user_id": request.user_id,
+            "operation": request.endpoint
+        }
+        if request.parameters:
+            data.update(request.parameters)
+        
+        # HTTPリクエスト実行
+        start_time = time.time()
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=request.timeout)) as session:
+                async with session.post(
+                    url,
+                    json=data,
+                    headers={"Content-Type": "application/json"}
+                ) as response:
+                    response_time = (time.time() - start_time) * 1000
+                    
+                    if response.status == 200:
+                        try:
+                            response_data = await response.json()
+                            result = {
+                                "status": "success",
+                                "response_time": response_time,
+                                "data": response_data,
+                                "status_code": response.status
+                            }
+                        except Exception:
+                            result = {
+                                "status": "error",
+                                "response_time": response_time,
+                                "error": "Invalid JSON response",
+                                "status_code": response.status
+                            }
+                    elif response.status == 302 and request.call_type == "via_main_app":
+                        # リダイレクトは認証が必要な場合の正常な応答
+                        result = {
+                            "status": "success",
+                            "response_time": response_time,
+                            "data": {"redirect": True, "message": "Redirected to login (authentication required)"},
+                            "status_code": response.status
+                        }
+                    else:
+                        response_text = await response.text()
+                        result = {
+                            "status": "error",
+                            "response_time": response_time,
+                            "error": f"HTTP {response.status}: {response_text}",
+                            "status_code": response.status
+                        }
+        except Exception as e:
+            result = {
+                "status": "error",
+                "response_time": (time.time() - start_time) * 1000,
+                "error": str(e),
+                "status_code": 0
+            }
+        
+        return {
+            "test_result": result,
+            "endpoint": request.endpoint,
+            "user_id": request.user_id,
+            "call_type": request.call_type,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error running distributed service test: {e}")
+        raise HTTPException(status_code=500, detail="Failed to run distributed service test")
+
+@router.get("/distributed-service/scenarios")
+async def get_distributed_test_scenarios():
+    """利用可能な分散サービステストシナリオを取得"""
+    try:
+        from config import config_manager
+        
+        config = config_manager.get_config()
+        scenarios = config.get("distributed_service", {}).get("test_scenarios", {})
+        
+        return {
+            "scenarios": scenarios,
+            "scenario_count": len(scenarios)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting distributed test scenarios: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get distributed test scenarios")
+
+@router.post("/distributed-service/load-test")
+async def start_distributed_load_test(request: DistributedLoadTestRequest):
+    """分散サービスの負荷テストを開始"""
+    try:
+        from config import config_manager
+        from distributed_test_scenarios import DistributedTestScenarios
+        
+        config = config_manager.get_config()
+        scenarios_config = config.get("distributed_service", {}).get("test_scenarios", {})
+        
+        # デバッグ情報をログに出力
+        logger.info(f"Available scenarios: {list(scenarios_config.keys())}")
+        logger.info(f"Requested scenario: {request.test_scenario}")
+        
+        if request.test_scenario not in scenarios_config:
+            available_scenarios = list(scenarios_config.keys())
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Unknown test scenario: {request.test_scenario}. Available scenarios: {available_scenarios}"
+            )
+        
+        scenario_config = scenarios_config[request.test_scenario].copy()
+        
+        # リクエストパラメータで設定を上書き
+        if request.concurrent_users is not None:
+            scenario_config["concurrent_users"] = request.concurrent_users
+        if request.duration_minutes is not None:
+            scenario_config["duration_minutes"] = request.duration_minutes
+        if request.call_type is not None:
+            scenario_config["call_type"] = request.call_type
+        
+        # 分散テストシナリオを実行
+        test_scenarios = DistributedTestScenarios()
+        
+        # ScenarioConfigオブジェクトを作成
+        from distributed_test_scenarios import ScenarioConfig, ScenarioType
+        
+        scenario_type_map = {
+            "basic_distributed_tracing": ScenarioType.BASIC_DISTRIBUTED_TRACING,
+            "n_plus_one_load_test": ScenarioType.N_PLUS_ONE_LOAD_TEST,
+            "slow_query_load_test": ScenarioType.SLOW_QUERY_LOAD_TEST,
+            "database_error_test": ScenarioType.DATABASE_ERROR_TEST,
+            "concurrent_users_test": ScenarioType.CONCURRENT_USERS_TEST,
+            "comprehensive_test": ScenarioType.COMPREHENSIVE_TEST
+        }
+        
+        config_obj = ScenarioConfig(
+            scenario_type=scenario_type_map[request.test_scenario],
+            concurrent_users=scenario_config.get("concurrent_users", 10),
+            duration_minutes=scenario_config.get("duration_minutes", 5),
+            ramp_up_seconds=scenario_config.get("ramp_up_seconds", 30),
+            request_interval_min=scenario_config.get("request_interval_min", 1.0),
+            request_interval_max=scenario_config.get("request_interval_max", 3.0),
+            call_type=scenario_config.get("call_type", "direct"),
+            include_trace_headers=scenario_config.get("include_trace_headers", True),
+            timeout_seconds=scenario_config.get("timeout_seconds", 30)
+        )
+        
+        # シナリオに応じてテストを実行
+        if request.test_scenario == "basic_distributed_tracing":
+            result = await test_scenarios.basic_distributed_tracing_test(config_obj)
+        elif request.test_scenario == "n_plus_one_load_test":
+            result = await test_scenarios.n_plus_one_load_test(config_obj)
+        elif request.test_scenario == "slow_query_load_test":
+            result = await test_scenarios.slow_query_load_test(config_obj)
+        elif request.test_scenario == "database_error_test":
+            result = await test_scenarios.database_error_test(config_obj)
+        elif request.test_scenario == "concurrent_users_test":
+            result = await test_scenarios.concurrent_users_test(config_obj)
+        elif request.test_scenario == "comprehensive_test":
+            result = await test_scenarios.comprehensive_test(config_obj)
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported test scenario: {request.test_scenario}")
+        
+        return {
+            "message": f"Distributed load test '{request.test_scenario}' completed",
+            "scenario": request.test_scenario,
+            "config": scenario_config,
+            "result": result,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error starting distributed load test: {e}")
+        raise HTTPException(status_code=500, detail="Failed to start distributed load test")
+
+@router.get("/distributed-service/metrics")
+async def get_distributed_service_metrics():
+    """分散サービステストのメトリクスを取得"""
+    try:
+        # 分散サービステスト用の統計情報を収集
+        from distributed_service_client import DistributedServiceTestClient
+        from config import config_manager
+        
+        config = config_manager.get_config()
+        
+        # 基本的なメトリクス情報を返す
+        metrics = {
+            "service_urls": {
+                "distributed_service": config.get("distributed_service", {}).get("base_url", ""),
+                "main_app_distributed": config.get("main_app_distributed", {}).get("base_url", "")
+            },
+            "available_endpoints": {
+                "distributed_service": config.get("distributed_service", {}).get("endpoints", {}),
+                "main_app_distributed": config.get("main_app_distributed", {}).get("endpoints", {})
+            },
+            "test_scenarios": list(config.get("distributed_service", {}).get("test_scenarios", {}).keys()),
+            "newrelic_integration": {
+                "enabled": config.get("newrelic_verification", {}).get("enabled", False),
+                "app_names": config.get("newrelic_verification", {}).get("app_names", [])
+            }
+        }
+        
+        return metrics
+        
+    except Exception as e:
+        logger.error(f"Error getting distributed service metrics: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get distributed service metrics")
+
+@router.get("/distributed-service/newrelic-status")
+async def get_newrelic_integration_status():
+    """New Relic統合の状態を取得"""
+    try:
+        from config import config_manager
+        
+        config = config_manager.get_config()
+        newrelic_config = config.get("newrelic_verification", {})
+        
+        status = {
+            "enabled": newrelic_config.get("enabled", False),
+            "api_key_configured": bool(newrelic_config.get("api_key")),
+            "account_id_configured": bool(newrelic_config.get("account_id")),
+            "app_names": newrelic_config.get("app_names", []),
+            "verification_timeout": newrelic_config.get("verification_timeout_seconds", 300),
+            "retry_attempts": newrelic_config.get("retry_attempts", 3)
+        }
+        
+        # New Relic検証機能が利用可能かチェック
+        try:
+            from newrelic_verification import NewRelicVerification
+            verification = NewRelicVerification()
+            status["verification_available"] = True
+            status["last_check"] = datetime.now().isoformat()
+        except ImportError:
+            status["verification_available"] = False
+            status["error"] = "NewRelic verification module not available"
+        except Exception as e:
+            status["verification_available"] = False
+            status["error"] = str(e)
+        
+        return status
+        
+    except Exception as e:
+        logger.error(f"Error getting NewRelic integration status: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get NewRelic integration status")
+
+@router.post("/distributed-service/verify-newrelic")
+async def verify_newrelic_traces():
+    """New Relicでの分散トレーシングを検証"""
+    try:
+        from newrelic_verification import NewRelicVerification
+        from config import config_manager
+        
+        config = config_manager.get_config()
+        newrelic_config = config.get("newrelic_verification", {})
+        
+        if not newrelic_config.get("enabled", False):
+            raise HTTPException(status_code=400, detail="NewRelic verification is not enabled")
+        
+        verification = NewRelicVerification()
+        
+        # 基本的な分散トレーシング検証を実行
+        result = await verification.verify_distributed_tracing()
+        
+        return {
+            "verification_result": result,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except ImportError:
+        raise HTTPException(status_code=503, detail="NewRelic verification module not available")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error verifying NewRelic traces: {e}")
+        raise HTTPException(status_code=500, detail="Failed to verify NewRelic traces")
+
+# 分散サービス設定管理API
+
+class DistributedServiceConfigRequest(BaseModel):
+    """分散サービス設定更新リクエスト"""
+    distributed_service: Optional[Dict[str, Any]] = None
+    main_app_distributed: Optional[Dict[str, Any]] = None
+    newrelic_verification: Optional[Dict[str, Any]] = None
+
+@router.get("/distributed-service/config")
+async def get_distributed_service_config():
+    """分散サービス設定を取得"""
+    try:
+        from config import config_manager
+        
+        config = config_manager.get_config()
+        
+        return {
+            "distributed_service": config.get("distributed_service", {}),
+            "main_app_distributed": config.get("main_app_distributed", {}),
+            "newrelic_verification": config.get("newrelic_verification", {})
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting distributed service config: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get distributed service config")
+
+@router.post("/distributed-service/config")
+async def update_distributed_service_config(request: DistributedServiceConfigRequest):
+    """分散サービス設定を更新"""
+    try:
+        from config import config_manager
+        
+        config = config_manager.get_config()
+        
+        # 設定を更新
+        if request.distributed_service is not None:
+            config["distributed_service"] = {**config.get("distributed_service", {}), **request.distributed_service}
+        
+        if request.main_app_distributed is not None:
+            config["main_app_distributed"] = {**config.get("main_app_distributed", {}), **request.main_app_distributed}
+        
+        if request.newrelic_verification is not None:
+            config["newrelic_verification"] = {**config.get("newrelic_verification", {}), **request.newrelic_verification}
+        
+        # 設定を保存
+        success = config_manager.update_config(config)
+        
+        if success:
+            return {
+                "message": "Distributed service configuration updated successfully",
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to save configuration")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating distributed service config: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update distributed service config")
+
+@router.get("/distributed-service/config/scenarios")
+async def get_test_scenarios_config():
+    """テストシナリオ設定を取得"""
+    try:
+        from config import config_manager
+        
+        config = config_manager.get_config()
+        scenarios = config.get("distributed_service", {}).get("test_scenarios", {})
+        
+        return {
+            "test_scenarios": scenarios,
+            "scenario_count": len(scenarios)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting test scenarios config: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get test scenarios config")
+
+class TestScenarioConfigRequest(BaseModel):
+    """テストシナリオ設定更新リクエスト"""
+    test_scenarios: Dict[str, Dict[str, Any]]
+
+@router.post("/distributed-service/config/scenarios")
+async def update_test_scenarios_config(request: TestScenarioConfigRequest):
+    """テストシナリオ設定を更新"""
+    try:
+        from config import config_manager
+        
+        config = config_manager.get_config()
+        
+        # 分散サービス設定が存在しない場合は作成
+        if "distributed_service" not in config:
+            config["distributed_service"] = {}
+        
+        # テストシナリオ設定を更新
+        config["distributed_service"]["test_scenarios"] = request.test_scenarios
+        
+        # 設定を保存
+        success = config_manager.update_config(config)
+        
+        if success:
+            return {
+                "message": "Test scenarios configuration updated successfully",
+                "updated_scenarios": list(request.test_scenarios.keys()),
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to save test scenarios configuration")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating test scenarios config: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update test scenarios config")

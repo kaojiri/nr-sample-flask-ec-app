@@ -308,3 +308,169 @@ def health_check():
             'status': 'error',
             'error': str(e)
         }), 500
+
+
+# Load Tester用の認証不要なAPIエンドポイント
+@distributed_bp.route('/api/n-plus-one', methods=['POST'])
+@newrelic.agent.function_trace()
+def api_n_plus_one():
+    """Load Tester用のN+1クエリテスト（認証不要）"""
+    try:
+        # リクエストデータを取得
+        data = request.get_json() or {}
+        user_id = data.get('user_id', 1)
+        operation = data.get('operation', 'n-plus-one')
+        parameters = data.get('parameters', {})
+        
+        # New Relic属性を追加
+        newrelic.agent.add_custom_attribute('user_id', user_id)
+        newrelic.agent.add_custom_attribute('enduser.id', str(user_id))
+        newrelic.agent.add_custom_attribute('operation_type', 'n_plus_one')
+        newrelic.agent.add_custom_attribute('distributed_call', True)
+        newrelic.agent.add_custom_attribute('api_source', 'load_tester')
+        
+        # 分散サービスを呼び出し
+        client = get_distributed_client()
+        limit = parameters.get('limit', 20)
+        result = client.call_n_plus_one(user_id=user_id, limit=limit)
+        
+        return jsonify({
+            'status': 'success',
+            'data': result,
+            'user_id': user_id,
+            'operation': operation
+        })
+        
+    except DistributedServiceError as e:
+        logger.error(f"Distributed service error in API N+1 query: {e}")
+        
+        newrelic.agent.add_custom_attribute('distributed_error', True)
+        newrelic.agent.add_custom_attribute('error_type', e.error_type or 'unknown')
+        newrelic.agent.notice_error()
+        
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'error_type': e.error_type
+        }), 500
+        
+    except Exception as e:
+        logger.error(f"Unexpected error in API N+1 query: {e}")
+        newrelic.agent.notice_error()
+        
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
+
+
+@distributed_bp.route('/api/slow-query', methods=['POST'])
+@newrelic.agent.function_trace()
+def api_slow_query():
+    """Load Tester用のスロークエリテスト（認証不要）"""
+    try:
+        # リクエストデータを取得
+        data = request.get_json() or {}
+        user_id = data.get('user_id', 1)
+        operation = data.get('operation', 'slow-query')
+        parameters = data.get('parameters', {})
+        
+        # New Relic属性を追加
+        newrelic.agent.add_custom_attribute('user_id', user_id)
+        newrelic.agent.add_custom_attribute('enduser.id', str(user_id))
+        newrelic.agent.add_custom_attribute('operation_type', 'slow_query')
+        newrelic.agent.add_custom_attribute('distributed_call', True)
+        newrelic.agent.add_custom_attribute('api_source', 'load_tester')
+        
+        # 分散サービスを呼び出し
+        client = get_distributed_client()
+        sleep_duration = parameters.get('sleep_duration', 3.0)
+        query_type = parameters.get('query_type', 'complex_join')
+        
+        result = client.call_slow_query(
+            user_id=user_id,
+            sleep_duration=sleep_duration,
+            query_type=query_type
+        )
+        
+        return jsonify({
+            'status': 'success',
+            'data': result,
+            'user_id': user_id,
+            'operation': operation
+        })
+        
+    except DistributedServiceError as e:
+        logger.error(f"Distributed service error in API slow query: {e}")
+        
+        newrelic.agent.add_custom_attribute('distributed_error', True)
+        newrelic.agent.add_custom_attribute('error_type', e.error_type or 'unknown')
+        newrelic.agent.notice_error()
+        
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'error_type': e.error_type
+        }), 500
+        
+    except Exception as e:
+        logger.error(f"Unexpected error in API slow query: {e}")
+        newrelic.agent.notice_error()
+        
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
+
+
+@distributed_bp.route('/api/database-error', methods=['POST'])
+@newrelic.agent.function_trace()
+def api_database_error():
+    """Load Tester用のデータベースエラーテスト（認証不要）"""
+    try:
+        # リクエストデータを取得
+        data = request.get_json() or {}
+        user_id = data.get('user_id', 1)
+        operation = data.get('operation', 'database-error')
+        parameters = data.get('parameters', {})
+        
+        # New Relic属性を追加
+        newrelic.agent.add_custom_attribute('user_id', user_id)
+        newrelic.agent.add_custom_attribute('enduser.id', str(user_id))
+        newrelic.agent.add_custom_attribute('operation_type', 'database_error')
+        newrelic.agent.add_custom_attribute('distributed_call', True)
+        newrelic.agent.add_custom_attribute('api_source', 'load_tester')
+        
+        # 分散サービスを呼び出し
+        client = get_distributed_client()
+        error_type = parameters.get('error_type', 'invalid_query')
+        result = client.call_database_error(user_id=user_id, error_type=error_type)
+        
+        return jsonify({
+            'status': 'success',
+            'data': result,
+            'user_id': user_id,
+            'operation': operation
+        })
+        
+    except DistributedServiceError as e:
+        logger.error(f"Distributed service error in API database error: {e}")
+        
+        newrelic.agent.add_custom_attribute('distributed_error', True)
+        newrelic.agent.add_custom_attribute('error_type', e.error_type or 'unknown')
+        newrelic.agent.notice_error()
+        
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'error_type': e.error_type
+        }), 500
+        
+    except Exception as e:
+        logger.error(f"Unexpected error in API database error: {e}")
+        newrelic.agent.notice_error()
+        
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500

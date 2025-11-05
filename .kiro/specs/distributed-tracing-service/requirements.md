@@ -12,6 +12,8 @@ New Relicで分散トレーシングを効果的に記録するために、メ�
 - **Custom_Attribute**: New Relicに送信するカスタムメタデータ（userId等）
 - **Distributed_Tracing**: 複数サービス間のリクエスト追跡機能
 - **HTTP_Sync_Call**: メインアプリケーションから分散サービスへのHTTP同期呼び出し
+- **Load_Tester**: 負荷テストを実行するテストツール
+- **Test_Scenario**: 分散トレーシング機能を検証する自動化されたテストケース
 
 ## Requirements
 
@@ -71,3 +73,27 @@ New Relicで分散トレーシングを効果的に記録するために、メ�
 3. THE Distributed_Service SHALL データベースエラーを意図的に発生させるエンドポイントを提供する
 4. THE Distributed_Service SHALL 各パフォーマンス問題でuserIdのCustom Attributeを含める
 5. THE Distributed_Service SHALL パフォーマンス問題がNew Relicの分散トレーシングで追跡できるようにする
+
+### Requirement 6
+
+**User Story:** QAエンジニアとして、分散トレーシングAPIの負荷テストを実行するために、Load Testerに分散サービスへのテストシナリオを統合したい
+
+#### Acceptance Criteria
+
+1. THE Load_Tester SHALL 分散サービスのエンドポイントを呼び出すテストシナリオを提供する
+2. THE Load_Tester SHALL メインアプリケーション経由での分散サービス呼び出しをテストする
+3. THE Load_Tester SHALL 分散サービスの各パフォーマンス問題エンドポイントを個別にテストする
+4. THE Load_Tester SHALL 分散トレーシングのレスポンス時間とエラー率を測定する
+5. THE Load_Tester SHALL 複数ユーザーでの同時分散サービス呼び出しをシミュレートする
+
+### Requirement 7
+
+**User Story:** 開発者として、分散トレーシングの動作を検証するために、自動化されたテストシナリオを実行したい
+
+#### Acceptance Criteria
+
+1. THE Test_Scenario SHALL メインアプリケーションから分散サービスへの基本的な呼び出しをテストする
+2. THE Test_Scenario SHALL 分散トレーシングヘッダーの正しい伝播を検証する
+3. THE Test_Scenario SHALL userIdのCustom Attributeが正しく設定されることを確認する
+4. THE Test_Scenario SHALL 各パフォーマンス問題シナリオの実行結果を検証する
+5. THE Test_Scenario SHALL New Relicでの分散トレーシング表示を自動的に確認する

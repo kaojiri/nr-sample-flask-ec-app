@@ -217,7 +217,19 @@ graph TB
 - スロークエリの実行時間測定
 - New Relicでの監視データ確認
 
-### 4. New Relic Monitoring Tests
+### 4. Load Testing with Load Tester Integration
+- 分散サービスエンドポイントの負荷テスト
+- 複数ユーザーでの同時アクセステスト
+- メインアプリケーション経由での分散呼び出し負荷テスト
+- パフォーマンス問題エンドポイントの個別負荷テスト
+
+### 5. Automated Test Scenarios
+- 分散トレーシングヘッダー伝播の自動検証
+- userIdのCustom Attribute設定の自動確認
+- New Relic分散トレーシング表示の自動検証
+- エラーシナリオの自動実行と検証
+
+### 6. New Relic Monitoring Tests
 - Custom Attributeの表示確認
 - 分散トレーシングの可視化確認
 - エラー追跡機能の確認
@@ -354,3 +366,149 @@ distributed-service:
 - レスポンス時間メトリクス
 - エラー率メトリクス
 - データベースクエリメトリクス
+## Loa
+d Tester Integration Design
+
+### 1. Load Tester Components
+
+#### 1.1 Distributed Service Test Client (`load-tester/distributed_service_client.py`)
+```python
+# 分散サービスへの直接呼び出し機能
+# メインアプリケーション経由での分散サービス呼び出し
+# 各パフォーマンス問題エンドポイントの個別テスト
+# レスポンス時間とエラー率の測定
+# New Relic分散トレーシングヘッダーの処理
+
+class DistributedServiceTestClient:
+    def __init__(self, config):
+        self.distributed_url = config['distributed_service']['base_url']
+        self.main_app_url = config['main_app_distributed']['base_url']
+    
+    def test_direct_call(self, endpoint, user_id):
+        # 分散サービスへの直接呼び出し
+        
+    def test_via_main_app(self, endpoint, user_id):
+        # メインアプリケーション経由での呼び出し
+```
+
+#### 1.2 Test Scenario Definitions (`load-tester/test_distributed_scenarios.py`)
+```python
+# 基本的な分散トレーシングテストシナリオ
+# N+1クエリ問題の負荷テストシナリオ
+# スロークエリの負荷テストシナリオ
+# データベースエラーの負荷テストシナリオ
+# 複数ユーザー同時アクセスシナリオ
+
+class DistributedTestScenarios:
+    def basic_distributed_tracing_test(self):
+        # 基本的な分散トレーシング機能のテスト
+        
+    def n_plus_one_load_test(self, concurrent_users=10):
+        # N+1クエリ問題の負荷テスト
+        
+    def slow_query_load_test(self, concurrent_users=5):
+        # スロークエリの負荷テスト
+        
+    def error_handling_test(self):
+        # エラーハンドリングのテスト
+```
+
+#### 1.3 New Relic Verification (`load-tester/newrelic_verification.py`)
+```python
+# New Relic APIを使った分散トレーシング確認
+# Custom Attributeの自動検証
+# エラー追跡データの確認
+# パフォーマンスメトリクスの検証
+
+class NewRelicVerification:
+    def verify_distributed_trace(self, trace_id):
+        # 分散トレーシングの確認
+        
+    def verify_custom_attributes(self, user_id):
+        # Custom Attributeの確認
+        
+    def verify_performance_metrics(self, endpoint):
+        # パフォーマンスメトリクスの確認
+```
+
+### 2. Load Tester Configuration Updates
+
+#### 2.1 Configuration File Updates (`load-tester/data/config.json`)
+```json
+{
+  "distributed_service": {
+    "base_url": "http://localhost:5002",
+    "endpoints": {
+      "n_plus_one": "/performance/n-plus-one",
+      "slow_query": "/performance/slow-query",
+      "database_error": "/performance/database-error"
+    },
+    "test_scenarios": {
+      "basic_load": {
+        "concurrent_users": 10,
+        "duration": 60,
+        "ramp_up": 10
+      },
+      "stress_test": {
+        "concurrent_users": 50,
+        "duration": 120,
+        "ramp_up": 30
+      }
+    }
+  },
+  "main_app_distributed": {
+    "base_url": "http://localhost:5000",
+    "endpoints": {
+      "distributed_n_plus_one": "/distributed/n-plus-one",
+      "distributed_slow_query": "/distributed/slow-query",
+      "distributed_database_error": "/distributed/database-error"
+    }
+  },
+  "newrelic_verification": {
+    "api_key": "${NEW_RELIC_API_KEY}",
+    "account_id": "${NEW_RELIC_ACCOUNT_ID}",
+    "app_names": [
+      "Flask-EC-Main-App",
+      "Flask-EC-Distributed-Service"
+    ]
+  }
+}
+```
+
+### 3. Test Execution Flow
+
+#### 3.1 Automated Test Pipeline
+```mermaid
+graph TD
+    A[Start Load Test] --> B[Initialize Test Environment]
+    B --> C[Execute Basic Distributed Tracing Test]
+    C --> D[Execute N+1 Query Load Test]
+    D --> E[Execute Slow Query Load Test]
+    E --> F[Execute Error Handling Test]
+    F --> G[Collect Performance Metrics]
+    G --> H[Verify New Relic Data]
+    H --> I[Generate Test Report]
+    I --> J[End]
+```
+
+#### 3.2 Test Metrics Collection
+- レスポンス時間の測定
+- エラー率の計算
+- スループットの測定
+- New Relic分散トレーシングデータの検証
+- Custom Attributeの確認
+- データベースパフォーマンスメトリクス
+
+### 4. Integration Points
+
+#### 4.1 Load Tester Dashboard Updates
+- 分散サービステスト結果の表示
+- 分散トレーシングメトリクスの可視化
+- New Relic連携状況の表示
+- エラー率とレスポンス時間のグラフ
+
+#### 4.2 Continuous Integration
+- 自動化されたテストスイートの実行
+- New Relic監視データの自動検証
+- パフォーマンス回帰テストの実行
+- テスト結果のレポート生成
