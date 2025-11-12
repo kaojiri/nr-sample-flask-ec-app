@@ -62,7 +62,7 @@ class DistributedServiceClient:
         """
         try:
             if user_id:
-                newrelic.agent.add_custom_attribute('user_id', user_id)
+                newrelic.agent.add_custom_attribute('user_id', str(user_id))
                 newrelic.agent.add_custom_attribute('enduser.id', str(user_id))
             
             newrelic.agent.add_custom_attribute('distributed_call', True)

@@ -22,7 +22,7 @@ def index():
     """分散トレーシングデモのインデックスページ"""
     try:
         # New RelicにCustom Attributeを設定
-        newrelic.agent.add_custom_attribute('user_id', current_user.id)
+        newrelic.agent.add_custom_attribute('user_id', str(current_user.id))
         newrelic.agent.add_custom_attribute('enduser.id', str(current_user.id))
         newrelic.agent.add_custom_attribute('page_type', 'distributed_demo_index')
         
@@ -66,7 +66,7 @@ def call_n_plus_one():
         user_id = current_user.id
         
         # New RelicにCustom Attributeを設定
-        newrelic.agent.add_custom_attribute('user_id', user_id)
+        newrelic.agent.add_custom_attribute('user_id', str(user_id))
         newrelic.agent.add_custom_attribute('enduser.id', str(user_id))
         newrelic.agent.add_custom_attribute('operation_type', 'n_plus_one')
         newrelic.agent.add_custom_attribute('distributed_call', True)
@@ -124,7 +124,7 @@ def call_slow_query():
         user_id = current_user.id
         
         # New RelicにCustom Attributeを設定
-        newrelic.agent.add_custom_attribute('user_id', user_id)
+        newrelic.agent.add_custom_attribute('user_id', str(user_id))
         newrelic.agent.add_custom_attribute('enduser.id', str(user_id))
         newrelic.agent.add_custom_attribute('operation_type', 'slow_query')
         newrelic.agent.add_custom_attribute('distributed_call', True)
@@ -187,7 +187,7 @@ def call_database_error():
         user_id = current_user.id
         
         # New RelicにCustom Attributeを設定
-        newrelic.agent.add_custom_attribute('user_id', user_id)
+        newrelic.agent.add_custom_attribute('user_id', str(user_id))
         newrelic.agent.add_custom_attribute('enduser.id', str(user_id))
         newrelic.agent.add_custom_attribute('operation_type', 'database_error')
         newrelic.agent.add_custom_attribute('distributed_call', True)
@@ -245,7 +245,7 @@ def call_test_all():
         user_id = current_user.id
         
         # New RelicにCustom Attributeを設定
-        newrelic.agent.add_custom_attribute('user_id', user_id)
+        newrelic.agent.add_custom_attribute('user_id', str(user_id))
         newrelic.agent.add_custom_attribute('enduser.id', str(user_id))
         newrelic.agent.add_custom_attribute('operation_type', 'test_all')
         newrelic.agent.add_custom_attribute('distributed_call', True)
@@ -323,7 +323,7 @@ def api_n_plus_one():
         parameters = data.get('parameters', {})
         
         # New Relic属性を追加
-        newrelic.agent.add_custom_attribute('user_id', user_id)
+        newrelic.agent.add_custom_attribute('user_id', str(user_id))
         newrelic.agent.add_custom_attribute('enduser.id', str(user_id))
         newrelic.agent.add_custom_attribute('operation_type', 'n_plus_one')
         newrelic.agent.add_custom_attribute('distributed_call', True)
@@ -376,7 +376,7 @@ def api_slow_query():
         parameters = data.get('parameters', {})
         
         # New Relic属性を追加
-        newrelic.agent.add_custom_attribute('user_id', user_id)
+        newrelic.agent.add_custom_attribute('user_id', str(user_id))
         newrelic.agent.add_custom_attribute('enduser.id', str(user_id))
         newrelic.agent.add_custom_attribute('operation_type', 'slow_query')
         newrelic.agent.add_custom_attribute('distributed_call', True)
@@ -435,7 +435,7 @@ def api_database_error():
         parameters = data.get('parameters', {})
         
         # New Relic属性を追加
-        newrelic.agent.add_custom_attribute('user_id', user_id)
+        newrelic.agent.add_custom_attribute('user_id', str(user_id))
         newrelic.agent.add_custom_attribute('enduser.id', str(user_id))
         newrelic.agent.add_custom_attribute('operation_type', 'database_error')
         newrelic.agent.add_custom_attribute('distributed_call', True)

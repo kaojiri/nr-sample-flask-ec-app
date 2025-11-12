@@ -355,8 +355,8 @@ class DistributedServiceErrorHandler:
         try:
             # Custom Attributeを設定
             if user_id:
-                newrelic.agent.add_custom_attribute('error_user_id', user_id)
-                newrelic.agent.add_custom_attribute('user_id', user_id)
+                newrelic.agent.add_custom_attribute('error_user_id', str(user_id))
+                newrelic.agent.add_custom_attribute('user_id', str(user_id))
             
             if operation:
                 newrelic.agent.add_custom_attribute('error_operation', operation)
@@ -535,7 +535,7 @@ def create_error_handlers(app):
         # New Relicに報告
         newrelic.agent.add_custom_attribute('error_type', 'bad_request')
         if user_id:
-            newrelic.agent.add_custom_attribute('user_id', user_id)
+            newrelic.agent.add_custom_attribute('user_id', str(user_id))
         if operation:
             newrelic.agent.add_custom_attribute('operation_type', operation)
         
