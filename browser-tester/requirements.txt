@@ -1,0 +1,7 @@
+# Browser Test Runner 依存パッケージ
+flask==3.1.1
+selenium==4.27.1
+requests==2.32.3
+pytest==8.3.4
+hypothesis==6.122.3
+pytest-mock==3.14.0

@@ -1,0 +1,719 @@
+{% extends "base.html" %}
+
+{% block title %}ブラウザテスト管理 - EC Shop{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">
+                <i class="fas fa-globe"></i> ブラウザテスト管理ダッシュボード
+            </h1>
+
+            <!-- Runner接続状態 -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-server"></i> Browser Test Runner ステータス</h5>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="refreshRunnerStatus()">
+                        <i class="fas fa-sync-alt"></i> 更新
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="d-flex align-items-center">
+                                <span id="runner-indicator" class="me-2">
+                                    {% if runner_status.connected %}
+                                    <i class="fas fa-circle text-success"></i>
+                                    {% else %}
+                                    <i class="fas fa-circle text-danger"></i>
+                                    {% endif %}
+                                </span>
+                                <div>
+                                    <strong>接続状態</strong><br>
+                                    <span id="runner-status-text">
+                                        {% if runner_status.connected %}
+                                        接続中
+                                        {% else %}
+                                        切断 - {{ runner_status.get('error', '不明なエラー') }}
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Chrome状態</strong><br>
+                            <span id="chrome-status">{{ runner_status.get('chrome_status', 'N/A') }}</span>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>ターゲットURL</strong><br>
+                            <span id="target-url">{{ runner_status.get('target_app_url', 'N/A') }}</span>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>稼働時間</strong><br>
+                            <span id="uptime">
+                                {% if runner_status.connected %}
+                                {{ "%.0f"|format(runner_status.get('uptime_seconds', 0)) }}秒
+                                {% else %}
+                                N/A
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- テストシナリオ実行セクション -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-play-circle"></i> テストシナリオ</h5>
+                    <button class="btn btn-primary" id="btn-run-all" onclick="runAllScenarios()" {% if not runner_status.connected %}disabled{% endif %}>
+                        <i class="fas fa-play"></i> 全シナリオ一括実行
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>シナリオ</th>
+                                    <th>説明</th>
+                                    <th>期待イベント</th>
+                                    <th>最終結果</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr id="scenario-row-navigation">
+                                    <td><i class="fas fa-route text-primary"></i> <strong>navigation</strong></td>
+                                    <td>主要ページへの順次ナビゲーション（PageView生成）</td>
+                                    <td><span class="badge bg-info">PageView ×6</span></td>
+                                    <td><span class="scenario-last-result" data-scenario="navigation">-</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary btn-run-scenario" data-scenario="navigation" {% if not runner_status.connected %}disabled{% endif %}>
+                                            <i class="fas fa-play"></i> 実行
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr id="scenario-row-interaction">
+                                    <td><i class="fas fa-hand-pointer text-success"></i> <strong>interaction</strong></td>
+                                    <td>ユーザー操作（クリック、フォーム入力）によるBrowserInteraction生成</td>
+                                    <td><span class="badge bg-info">BrowserInteraction ×4</span></td>
+                                    <td><span class="scenario-last-result" data-scenario="interaction">-</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary btn-run-scenario" data-scenario="interaction" {% if not runner_status.connected %}disabled{% endif %}>
+                                            <i class="fas fa-play"></i> 実行
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr id="scenario-row-ajax">
+                                    <td><i class="fas fa-exchange-alt text-warning"></i> <strong>ajax</strong></td>
+                                    <td>AJAXリクエスト発生操作によるAjaxRequestイベント生成</td>
+                                    <td><span class="badge bg-info">AjaxRequest ×3</span></td>
+                                    <td><span class="scenario-last-result" data-scenario="ajax">-</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary btn-run-scenario" data-scenario="ajax" {% if not runner_status.connected %}disabled{% endif %}>
+                                            <i class="fas fa-play"></i> 実行
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr id="scenario-row-js_errors">
+                                    <td><i class="fas fa-bug text-danger"></i> <strong>js_errors</strong></td>
+                                    <td>JSエラートリガーによるJavaScriptErrorイベント生成</td>
+                                    <td><span class="badge bg-info">JavaScriptError ×6</span></td>
+                                    <td><span class="scenario-last-result" data-scenario="js_errors">-</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary btn-run-scenario" data-scenario="js_errors" {% if not runner_status.connected %}disabled{% endif %}>
+                                            <i class="fas fa-play"></i> 実行
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr id="scenario-row-web_vitals">
+                                    <td><i class="fas fa-tachometer-alt text-info"></i> <strong>web_vitals</strong></td>
+                                    <td>パフォーマンス問題ページアクセスによるCore Web Vitalsデータ生成</td>
+                                    <td><span class="badge bg-info">PageView ×2</span></td>
+                                    <td><span class="scenario-last-result" data-scenario="web_vitals">-</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary btn-run-scenario" data-scenario="web_vitals" {% if not runner_status.connected %}disabled{% endif %}>
+                                            <i class="fas fa-play"></i> 実行
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 実行ステータス・結果表示エリア -->
+            <div class="card mb-4" id="execution-panel" style="display: none;">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-spinner fa-spin" id="exec-spinner"></i> <span id="exec-title">テスト実行中...</span></h5>
+                </div>
+                <div class="card-body">
+                    <!-- プログレスバー -->
+                    <div id="exec-progress-section" class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span id="exec-progress-text">準備中...</span>
+                            <span id="exec-progress-count"></span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" id="exec-progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- 結果サマリー -->
+                    <div id="exec-summary" style="display: none;">
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <div class="card text-center border-primary">
+                                    <div class="card-body py-2">
+                                        <h4 class="text-primary mb-0" id="result-total">0</h4>
+                                        <small>合計テスト数</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center border-success">
+                                    <div class="card-body py-2">
+                                        <h4 class="text-success mb-0" id="result-passed">0</h4>
+                                        <small>成功</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center border-danger">
+                                    <div class="card-body py-2">
+                                        <h4 class="text-danger mb-0" id="result-failed">0</h4>
+                                        <small>失敗</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center border-secondary">
+                                    <div class="card-body py-2">
+                                        <h4 class="text-secondary mb-0" id="result-duration">0s</h4>
+                                        <small>実行時間</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 期待イベント数 -->
+                    <div id="exec-expected-events" style="display: none;">
+                        <h6><i class="fas fa-chart-bar"></i> 生成期待イベント数（概算）</h6>
+                        <div class="row">
+                            <div class="col-md-3"><span class="badge bg-primary me-1">PageView</span> <strong id="expected-pageview">0</strong></div>
+                            <div class="col-md-3"><span class="badge bg-success me-1">BrowserInteraction</span> <strong id="expected-interaction">0</strong></div>
+                            <div class="col-md-3"><span class="badge bg-warning text-dark me-1">AjaxRequest</span> <strong id="expected-ajax">0</strong></div>
+                            <div class="col-md-3"><span class="badge bg-danger me-1">JavaScriptError</span> <strong id="expected-jserror">0</strong></div>
+                        </div>
+                    </div>
+
+                    <!-- シナリオ詳細結果 -->
+                    <div id="exec-details" class="mt-3" style="display: none;">
+                        <h6><i class="fas fa-list-alt"></i> シナリオ別結果</h6>
+                        <div class="accordion" id="scenario-results-accordion"></div>
+                    </div>
+
+                    <!-- エラー詳細 -->
+                    <div id="exec-errors" class="mt-3" style="display: none;">
+                        <h6 class="text-danger"><i class="fas fa-exclamation-triangle"></i> エラー詳細</h6>
+                        <div id="error-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- テスト実行履歴 -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-history"></i> テスト実行履歴</h5>
+                </div>
+                <div class="card-body">
+                    {% if test_history %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th>実行ID</th>
+                                    <th>ステータス</th>
+                                    <th>シナリオ数</th>
+                                    <th>成功/失敗</th>
+                                    <th>実行時間</th>
+                                    <th>開始日時</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for run in test_history %}
+                                <tr>
+                                    <td><code>{{ run.get('run_id', 'N/A')[:8] }}...</code></td>
+                                    <td>
+                                        {% if run.get('status') == 'completed' %}
+                                        <span class="badge bg-success">完了</span>
+                                        {% elif run.get('status') == 'failed' %}
+                                        <span class="badge bg-danger">失敗</span>
+                                        {% elif run.get('status') == 'running' %}
+                                        <span class="badge bg-warning text-dark">実行中</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ run.get('status', 'unknown') }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ run.get('summary', {}).get('total', 0) }}</td>
+                                    <td>
+                                        <span class="text-success">{{ run.get('summary', {}).get('passed', 0) }}</span> /
+                                        <span class="text-danger">{{ run.get('summary', {}).get('failed', 0) }}</span>
+                                    </td>
+                                    <td>{{ "%.1f"|format(run.get('duration_seconds', 0)) }}s</td>
+                                    <td>{{ run.get('started_at', 'N/A') }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0">テスト実行履歴がありません。テストを実行すると、ここに結果が表示されます。</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- New Relic データ確認リファレンス -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-line"></i> New Relic Browser データ確認</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">テスト実行後、以下のNRQLクエリでNew Relic上のデータ生成を確認できます。</p>
+
+                    <!-- イベントタイプ一覧 -->
+                    <div class="row">
+                        <!-- PageView -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100">
+                                <div class="card-header bg-primary text-white py-2">
+                                    <strong><i class="fas fa-file-alt"></i> PageView</strong>
+                                </div>
+                                <div class="card-body">
+                                    <p class="small text-muted">ページナビゲーション時に生成されるイベント。各ページロードのURL、読み込み時間、ブラウザ情報を記録。</p>
+                                    <pre class="bg-light p-2 rounded small"><code>SELECT count(*) FROM PageView
+WHERE appName = 'Flask EC App'
+SINCE 30 minutes ago
+FACET pageUrl</code></pre>
+                                    <a href="https://one.newrelic.com/browser/page-views" target="_blank" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-external-link-alt"></i> Page Views を確認
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BrowserInteraction -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100">
+                                <div class="card-header bg-success text-white py-2">
+                                    <strong><i class="fas fa-hand-pointer"></i> BrowserInteraction</strong>
+                                </div>
+                                <div class="card-body">
+                                    <p class="small text-muted">ユーザー操作（クリック、ルート変更）時に生成されるイベント。操作のカテゴリ、ターゲット要素、レスポンスタイムを記録。</p>
+                                    <pre class="bg-light p-2 rounded small"><code>SELECT count(*) FROM BrowserInteraction
+WHERE appName = 'Flask EC App'
+SINCE 30 minutes ago
+FACET category, browserInteractionName</code></pre>
+                                    <a href="https://one.newrelic.com/browser/session-traces" target="_blank" class="btn btn-sm btn-outline-success">
+                                        <i class="fas fa-external-link-alt"></i> Session Traces を確認
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- AjaxRequest -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100">
+                                <div class="card-header bg-warning text-dark py-2">
+                                    <strong><i class="fas fa-exchange-alt"></i> AjaxRequest</strong>
+                                </div>
+                                <div class="card-body">
+                                    <p class="small text-muted">ブラウザからのXHR/Fetchリクエスト時に生成されるイベント。リクエストURL、ステータスコード、レスポンスタイムを記録。</p>
+                                    <pre class="bg-light p-2 rounded small"><code>SELECT count(*) FROM AjaxRequest
+WHERE appName = 'Flask EC App'
+SINCE 30 minutes ago
+FACET requestUrl, httpResponseCode</code></pre>
+                                    <a href="https://one.newrelic.com/browser/ajax" target="_blank" class="btn btn-sm btn-outline-warning">
+                                        <i class="fas fa-external-link-alt"></i> AJAX を確認
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- JavaScriptError -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100">
+                                <div class="card-header bg-danger text-white py-2">
+                                    <strong><i class="fas fa-bug"></i> JavaScriptError</strong>
+                                </div>
+                                <div class="card-body">
+                                    <p class="small text-muted">JavaScript実行エラー時に生成されるイベント。エラーメッセージ、スタックトレース、発生ページを記録。</p>
+                                    <pre class="bg-light p-2 rounded small"><code>SELECT count(*) FROM JavaScriptError
+WHERE appName = 'Flask EC App'
+SINCE 30 minutes ago
+FACET errorMessage, pageUrl</code></pre>
+                                    <a href="https://one.newrelic.com/browser/js-errors" target="_blank" class="btn btn-sm btn-outline-danger">
+                                        <i class="fas fa-external-link-alt"></i> JS Errors を確認
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 追加NRQLクエリ例 -->
+                    <div class="mt-3">
+                        <h6><i class="fas fa-code"></i> 追加確認用NRQLクエリ</h6>
+                        <div class="accordion" id="nrql-queries-accordion">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#nrql-all-events">
+                                        全イベント概要確認
+                                    </button>
+                                </h2>
+                                <div id="nrql-all-events" class="accordion-collapse collapse" data-bs-parent="#nrql-queries-accordion">
+                                    <div class="accordion-body">
+                                        <pre class="bg-light p-2 rounded small"><code>SELECT count(*) FROM PageView, BrowserInteraction, AjaxRequest, JavaScriptError
+WHERE appName = 'Flask EC App'
+SINCE 1 hour ago
+FACET eventType()</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#nrql-web-vitals">
+                                        Core Web Vitals 確認
+                                    </button>
+                                </h2>
+                                <div id="nrql-web-vitals" class="accordion-collapse collapse" data-bs-parent="#nrql-queries-accordion">
+                                    <div class="accordion-body">
+                                        <pre class="bg-light p-2 rounded small"><code>SELECT average(largestContentfulPaint) as 'LCP',
+       average(cumulativeLayoutShift) as 'CLS',
+       average(interactionToNextPaint) as 'INP'
+FROM PageViewTiming
+WHERE appName = 'Flask EC App'
+SINCE 1 hour ago</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#nrql-page-load">
+                                        ページロード時間の詳細
+                                    </button>
+                                </h2>
+                                <div id="nrql-page-load" class="accordion-collapse collapse" data-bs-parent="#nrql-queries-accordion">
+                                    <div class="accordion-body">
+                                        <pre class="bg-light p-2 rounded small"><code>SELECT average(duration), percentile(duration, 95),
+       average(domProcessingDuration), average(pageRenderingDuration)
+FROM PageView
+WHERE appName = 'Flask EC App'
+SINCE 1 hour ago
+FACET pageUrl</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- New Relic Browserリンク集 -->
+                    <div class="mt-3">
+                        <h6><i class="fas fa-link"></i> New Relic Browser 確認ページ</h6>
+                        <div class="btn-group flex-wrap" role="group">
+                            <a href="https://one.newrelic.com/browser/summary" target="_blank" class="btn btn-outline-dark btn-sm m-1">
+                                <i class="fas fa-tachometer-alt"></i> Summary
+                            </a>
+                            <a href="https://one.newrelic.com/browser/page-views" target="_blank" class="btn btn-outline-dark btn-sm m-1">
+                                <i class="fas fa-file-alt"></i> Page Views
+                            </a>
+                            <a href="https://one.newrelic.com/browser/ajax" target="_blank" class="btn btn-outline-dark btn-sm m-1">
+                                <i class="fas fa-exchange-alt"></i> AJAX
+                            </a>
+                            <a href="https://one.newrelic.com/browser/js-errors" target="_blank" class="btn btn-outline-dark btn-sm m-1">
+                                <i class="fas fa-bug"></i> JS Errors
+                            </a>
+                            <a href="https://one.newrelic.com/browser/session-traces" target="_blank" class="btn btn-outline-dark btn-sm m-1">
+                                <i class="fas fa-route"></i> Session Traces
+                            </a>
+                            <a href="https://one.newrelic.com/browser/web-vitals" target="_blank" class="btn btn-outline-dark btn-sm m-1">
+                                <i class="fas fa-heartbeat"></i> Web Vitals
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// ブラウザテスト管理ダッシュボード JavaScript
+// ============================================================
+
+const API_BASE = '/browser-tests/api';
+let currentRunId = null;
+let pollingInterval = null;
+
+// --- テスト実行 ---
+
+function runAllScenarios() {
+    triggerRun(null);
+}
+
+document.querySelectorAll('.btn-run-scenario').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const scenario = this.dataset.scenario;
+        triggerRun([scenario]);
+    });
+});
+
+function triggerRun(scenarios) {
+    const payload = scenarios ? { scenarios: scenarios } : {};
+
+    // UIを実行中状態に切り替え
+    setExecutionUI('running', scenarios ? scenarios.join(', ') : '全シナリオ');
+    disableRunButtons(true);
+
+    fetch(`${API_BASE}/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => { throw new Error(data.error || `HTTP ${response.status}`); });
+        }
+        return response.json();
+    })
+    .then(data => {
+        currentRunId = data.run_id;
+        startPolling(data.run_id);
+    })
+    .catch(error => {
+        setExecutionUI('error', error.message);
+        disableRunButtons(false);
+    });
+}
+
+// --- ステータスポーリング ---
+
+function startPolling(runId) {
+    if (pollingInterval) clearInterval(pollingInterval);
+    pollingInterval = setInterval(() => pollStatus(runId), 3000);
+    // 即座に1回目を実行
+    pollStatus(runId);
+}
+
+function stopPolling() {
+    if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+    }
+}
+
+function pollStatus(runId) {
+    fetch(`${API_BASE}/status/${runId}`)
+    .then(response => response.json())
+    .then(data => {
+        updateProgressUI(data);
+
+        if (data.status === 'completed' || data.status === 'failed') {
+            stopPolling();
+            fetchResults(runId);
+        }
+    })
+    .catch(error => {
+        console.error('Polling error:', error);
+    });
+}
+
+// --- 結果取得 ---
+
+function fetchResults(runId) {
+    fetch(`${API_BASE}/results/${runId}`)
+    .then(response => response.json())
+    .then(data => {
+        displayResults(data);
+        disableRunButtons(false);
+    })
+    .catch(error => {
+        setExecutionUI('error', '結果の取得に失敗しました: ' + error.message);
+        disableRunButtons(false);
+    });
+}
+
+// --- UI更新 ---
+
+function setExecutionUI(state, message) {
+    const panel = document.getElementById('execution-panel');
+    const spinner = document.getElementById('exec-spinner');
+    const title = document.getElementById('exec-title');
+
+    panel.style.display = 'block';
+
+    if (state === 'running') {
+        spinner.className = 'fas fa-spinner fa-spin';
+        title.textContent = `テスト実行中: ${message}`;
+        document.getElementById('exec-progress-section').style.display = 'block';
+        document.getElementById('exec-summary').style.display = 'none';
+        document.getElementById('exec-expected-events').style.display = 'none';
+        document.getElementById('exec-details').style.display = 'none';
+        document.getElementById('exec-errors').style.display = 'none';
+    } else if (state === 'error') {
+        spinner.className = 'fas fa-exclamation-circle text-danger';
+        title.textContent = `エラー: ${message}`;
+        document.getElementById('exec-progress-section').style.display = 'none';
+    }
+}
+
+function updateProgressUI(data) {
+    const progressText = document.getElementById('exec-progress-text');
+    const progressCount = document.getElementById('exec-progress-count');
+    const progressBar = document.getElementById('exec-progress-bar');
+
+    if (data.progress) {
+        const { total_scenarios, completed_scenarios, current_scenario } = data.progress;
+        const pct = total_scenarios > 0 ? Math.round((completed_scenarios / total_scenarios) * 100) : 0;
+        progressText.textContent = current_scenario ? `実行中: ${current_scenario}` : '処理中...';
+        progressCount.textContent = `${completed_scenarios} / ${total_scenarios}`;
+        progressBar.style.width = `${pct}%`;
+    }
+}
+
+function displayResults(data) {
+    const spinner = document.getElementById('exec-spinner');
+    const title = document.getElementById('exec-title');
+
+    // ヘッダー更新
+    if (data.status === 'completed') {
+        spinner.className = 'fas fa-check-circle text-success';
+        title.textContent = 'テスト完了';
+    } else {
+        spinner.className = 'fas fa-times-circle text-danger';
+        title.textContent = 'テスト失敗';
+    }
+
+    document.getElementById('exec-progress-section').style.display = 'none';
+
+    // サマリー表示
+    const summary = data.summary || {};
+    document.getElementById('result-total').textContent = summary.total || 0;
+    document.getElementById('result-passed').textContent = summary.passed || 0;
+    document.getElementById('result-failed').textContent = summary.failed || 0;
+    document.getElementById('result-duration').textContent = (data.duration_seconds || 0).toFixed(1) + 's';
+    document.getElementById('exec-summary').style.display = 'block';
+
+    // 期待イベント数表示
+    const events = data.expected_newrelic_events || {};
+    document.getElementById('expected-pageview').textContent = events.PageView || 0;
+    document.getElementById('expected-interaction').textContent = events.BrowserInteraction || 0;
+    document.getElementById('expected-ajax').textContent = events.AjaxRequest || 0;
+    document.getElementById('expected-jserror').textContent = events.JavaScriptError || 0;
+    document.getElementById('exec-expected-events').style.display = 'block';
+
+    // シナリオ詳細
+    if (data.scenarios && data.scenarios.length > 0) {
+        renderScenarioDetails(data.scenarios);
+        document.getElementById('exec-details').style.display = 'block';
+    }
+
+    // エラー詳細
+    const errors = (data.scenarios || []).filter(s => s.status === 'failed');
+    if (errors.length > 0) {
+        renderErrors(errors);
+        document.getElementById('exec-errors').style.display = 'block';
+    }
+
+    // シナリオ別最終結果を更新
+    (data.scenarios || []).forEach(scenario => {
+        const el = document.querySelector(`.scenario-last-result[data-scenario="${scenario.name}"]`);
+        if (el) {
+            if (scenario.status === 'completed') {
+                el.innerHTML = '<span class="badge bg-success">成功</span>';
+            } else {
+                el.innerHTML = '<span class="badge bg-danger">失敗</span>';
+            }
+        }
+    });
+}
+
+function renderScenarioDetails(scenarios) {
+    const accordion = document.getElementById('scenario-results-accordion');
+    accordion.innerHTML = '';
+
+    scenarios.forEach((scenario, idx) => {
+        const statusBadge = scenario.status === 'completed'
+            ? '<span class="badge bg-success">成功</span>'
+            : '<span class="badge bg-danger">失敗</span>';
+
+        const stepsHtml = (scenario.steps || []).map(step => {
+            const icon = step.success ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>';
+            const loadTime = step.load_time_ms ? ` (${step.load_time_ms}ms)` : '';
+            const errorMsg = step.error_message ? `<br><small class="text-danger">${escapeHtml(step.error_message)}</small>` : '';
+            return `<li class="list-group-item py-1">${icon} <code>${escapeHtml(step.action)}</code> → ${escapeHtml(step.target)}${loadTime}${errorMsg}</li>`;
+        }).join('');
+
+        const item = `
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#scenario-detail-${idx}">
+                    ${statusBadge} <strong class="ms-2">${escapeHtml(scenario.name)}</strong>
+                    <small class="ms-auto text-muted">${(scenario.duration_seconds || 0).toFixed(1)}s</small>
+                </button>
+            </h2>
+            <div id="scenario-detail-${idx}" class="accordion-collapse collapse" data-bs-parent="#scenario-results-accordion">
+                <div class="accordion-body p-0">
+                    <ul class="list-group list-group-flush">${stepsHtml}</ul>
+                </div>
+            </div>
+        </div>`;
+        accordion.innerHTML += item;
+    });
+}
+
+function renderErrors(failedScenarios) {
+    const errorList = document.getElementById('error-list');
+    errorList.innerHTML = '';
+
+    failedScenarios.forEach(scenario => {
+        const errorMsg = scenario.error_message || '詳細不明';
+        const failedSteps = (scenario.steps || []).filter(s => !s.success);
+        const stepsDetail = failedSteps.map(s =>
+            `<li><code>${escapeHtml(s.action)}</code> → ${escapeHtml(s.target)}: ${escapeHtml(s.error_message || '不明')}</li>`
+        ).join('');
+
+        errorList.innerHTML += `
+        <div class="alert alert-danger py-2">
+            <strong>${escapeHtml(scenario.name)}</strong>: ${escapeHtml(errorMsg)}
+            ${stepsDetail ? '<ul class="mb-0 mt-1 small">' + stepsDetail + '</ul>' : ''}
+        </div>`;
+    });
+}
+
+// --- ユーティリティ ---
+
+function disableRunButtons(disabled) {
+    document.getElementById('btn-run-all').disabled = disabled;
+    document.querySelectorAll('.btn-run-scenario').forEach(btn => btn.disabled = disabled);
+}
+
+function refreshRunnerStatus() {
+    fetch(`${API_BASE}/run`, { method: 'OPTIONS' })
+    .catch(() => {});
+    // ページリロードで最新状態を取得
+    location.reload();
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}

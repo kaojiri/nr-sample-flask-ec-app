@@ -53,7 +53,7 @@ def create_app():
             app.logger.error(f'❌ Failed to set New Relic custom attributes: {e}')
 
     # Register blueprints
-    from app.routes import main, auth, products, cart, performance_issues, bulk_users, error_reports, distributed
+    from app.routes import main, auth, products, cart, performance_issues, bulk_users, error_reports, distributed, browser_tests
     app.register_blueprint(main.bp)
     app.register_blueprint(auth.bp)
     app.register_blueprint(products.bp)
@@ -63,5 +63,6 @@ def create_app():
     app.register_blueprint(bulk_users.admin_bp)  # 管理画面
     app.register_blueprint(error_reports.error_reports_bp)
     app.register_blueprint(distributed.distributed_bp)  # 分散トレーシングサービス
+    app.register_blueprint(browser_tests.bp)  # ブラウザテスト管理ダッシュボード
 
     return app
