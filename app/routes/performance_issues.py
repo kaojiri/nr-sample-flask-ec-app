@@ -829,3 +829,19 @@ def generate_test_data_execute():
                              success=False,
                              error=str(e),
                              **results), 500
+
+
+@bp.route('/rage-click')
+def rage_click_demo():
+    """
+    Rage Click demo page - 反応しないボタンでRage Clickを再現
+
+    New Relic Session Replay will detect:
+    - Rage clicks (同じ要素を短時間に連続クリック)
+    - User frustration signals
+    """
+    current_app.logger.info('Rage click demo page accessed', extra={
+        'event_type': 'demo_page_view',
+        'page': 'rage_click'
+    })
+    return render_template('performance/rage_click.html')

@@ -160,3 +160,69 @@ class InteractionScenario(BaseScenario):
             logger.warning("Failed to click product link, skipping cart add")
 
         return any_success
+
+    def _execute_rage_click(self):
+        """Rage Click を再現する（同じボタンを短時間に6回連打）
+
+        JSエラーページのNull Referenceボタンを約400ms間隔で6回クリックする。
+        New Relic Session ReplayがRage Clickとして検出する条件:
+        - 同一要素を短時間（数秒以内）に複数回クリック
+        """
+        import time
+        from selenium.webdriver.common.by import By
+        from selenium.common.exceptions import WebDriverException
+
+        logger.info("=== Rage Click simulation ===")
+
+        # JSエラーページに遷移
+        nav_result = self.navigate_to("/performance/js-errors")
+        self.results.append(nav_result)
+        if not nav_result.success:
+            logger.warning("Failed to navigate to JS errors page for rage click")
+            return
+
+        # Null Reference ボタンを探す
+        selector = "button[onclick*='triggerNullError']"
+        try:
+            from selenium.webdriver.support.ui import WebDriverWait
+            from selenium.webdriver.support import expected_conditions as EC
+
+            button = WebDriverWait(self.driver, 5).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
+            )
+        except Exception:
+            logger.warning("Rage click target button not found")
+            return
+
+        # 10回連打（約100ms間隔 = 1秒以内に10クリック）
+        start_time = time.time()
+        click_count = 0
+        for i in range(10):
+            try:
+                button.click()
+                click_count += 1
+                time.sleep(0.1)  # 100ms間隔
+            except WebDriverException:
+                pass
+
+        duration_ms = (time.time() - start_time) * 1000
+
+        # 結果を記録
+        rage_step = StepResult(
+            action="rage_click",
+            target=selector,
+            success=click_count >= 4,
+            duration_ms=duration_ms,
+            metadata={
+                "click_count": click_count,
+                "interval_ms": 100,
+                "target_button": "triggerNullError",
+                "purpose": "Session Replay Rage Click detection",
+            },
+        )
+        self.results.append(rage_step)
+
+        # Rage Click後にBrowser Agentがデータ送信する時間を確保
+        time.sleep(3.0)
+
+        logger.info(f"Rage click completed: {click_count} clicks in {duration_ms:.0f}ms")

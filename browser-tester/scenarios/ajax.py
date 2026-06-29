@@ -1,14 +1,22 @@
-"""AJAXリクエストモニタリングテストシナリオ
+"""AJAXリクエスト＋分散トレーシングテストシナリオ
 
-分散トレーシングデモページおよびパフォーマンスデモページで
-AJAXリクエスト（XHR/Fetch）をトリガーし、New Relic BrowserのAjaxRequestイベント
-生成を検証する。
+分散トレーシングデモページで以下のバックエンド操作を実ブラウザから実行し、
+Browser → Flask EC App → Flask-EC-Distributed-Service の分散トレースを生成する:
 
-正常系（200レスポンス）と異常系（500レスポンス）の両方をテストする。
+1. N+1クエリ問題の再現
+2. Slow Query（pg_sleep, complex_join, cartesian_product）の再現
+3. データベースエラー（syntax, constraint, connection, timeout）の再現
+4. JSエラーページでのNetwork Errorトリガー
+
+各操作後に十分な待機時間を設け、New Relic Browser Agent と APM Agent の
+データ送信を確保する。
 """
 
 import logging
-from typing import List
+from typing import List, Tuple
+
+from selenium.webdriver.common.by import By
+from selenium.common.exceptions import WebDriverException
 
 from scenarios.base import BaseScenario
 from scenario_engine import register_scenario
@@ -19,99 +27,75 @@ logger = logging.getLogger(__name__)
 
 @register_scenario
 class AjaxScenario(BaseScenario):
-    """AJAXリクエスト発生操作によるAjaxRequestイベント生成"""
+    """分散トレーシング＋DB問題再現によるAjaxRequestイベント生成"""
 
     name = "ajax"
-    description = "AJAXリクエスト発生操作によるAjaxRequestイベント生成"
-
-    # AJAXトリガーボタン定義
-    # 分散トレーシングページ: 正常系（200レスポンス）+ 分散サービス呼び出し
-    DISTRIBUTED_AJAX_BUTTONS: List[tuple] = [
-        (
-            "button[onclick*='callNPlusOne']",
-            "N+1クエリ実行（分散サービス呼び出し）",
-        ),
-        (
-            "button[onclick*='callSlowQuery']",
-            "スロークエリ実行（分散サービス呼び出し）",
-        ),
-        (
-            "button[onclick*='callDatabaseError']",
-            "データベースエラー（分散サービス異常系）",
-        ),
-    ]
-
-    # パフォーマンスデモページ: 異常系（500レスポンス）
-    ERROR_AJAX_BUTTON = (
-        "button[onclick*='triggerNetworkError']",
-        "Network Error（異常系AJAX 500）",
-    )
+    description = "分散トレーシング経由でN+1/SlowQuery/DBエラーを再現しAjaxRequestを生成"
 
     def execute(self) -> ScenarioResult:
         """AJAXリクエストシナリオを実行
 
-        1. ログイン（認証が必要なページがあるため）
-        2. 分散トレーシングデモページでAJAXリクエストをトリガー（正常系）
-        3. パフォーマンスデモページでネットワークエラーをトリガー（異常系）
+        1. ログイン
+        2. N+1クエリ問題の実行（limit=50で多数のクエリ発行）
+        3. Slow Query の実行（pg_sleep 3秒 + complex_join）
+        4. データベースエラーの実行（全4タイプ）
+        5. JSエラーページでのNetwork Error
 
         Returns:
             ScenarioResult: シナリオ実行結果
         """
         ajax_request_count = 0
 
-        # --- ログイン（分散トレーシングページには認証が必要） ---
-        self._login()
+        # --- ログイン ---
+        if not self._login():
+            return ScenarioResult(
+                name=self.name,
+                status=TestStatus.FAILED,
+                steps=self.results,
+                error_message="Login failed",
+                expected_events={"AjaxRequest": 0},
+            )
 
-        # --- 正常系: 分散トレーシングデモページ ---
-        logger.info("Navigating to distributed tracing demo page for AJAX tests")
+        # --- 分散トレーシングページへ遷移 ---
         nav_step = self.navigate_to("/distributed/")
         self.results.append(nav_step)
 
-        if nav_step.success:
-            for selector, description in self.DISTRIBUTED_AJAX_BUTTONS:
-                logger.info(f"Clicking AJAX trigger: {description}")
-                # AJAXリクエスト後に3秒以上待機（Requirements 4.2）
-                click_step = self.click_element(selector, wait_after=3.0)
-                click_step.page_name = description
-                click_step.metadata = {
-                    "ajax_type": "distributed_trace",
-                    "page": "/distributed/",
-                    "backend_service": "Flask-EC-Distributed-Service",
-                }
-                self.results.append(click_step)
+        if not nav_step.success:
+            logger.error("Failed to navigate to distributed page")
+            return ScenarioResult(
+                name=self.name,
+                status=TestStatus.FAILED,
+                steps=self.results,
+                error_message="Failed to navigate to distributed tracing page",
+                expected_events={"AjaxRequest": 0},
+            )
 
-                if click_step.success:
-                    ajax_request_count += 1
-        else:
-            logger.warning("Failed to navigate to distributed tracing page, skipping AJAX triggers")
+        # --- 1. N+1クエリ問題 ---
+        logger.info("=== N+1 Query Problem ===")
+        count = self._execute_n_plus_one(limit=50)
+        ajax_request_count += count
 
-        # --- 異常系: パフォーマンスデモページ（500エラー） ---
-        logger.info("Navigating to JS errors page for error AJAX test")
-        nav_step_errors = self.navigate_to("/performance/js-errors")
-        self.results.append(nav_step_errors)
+        # --- 2. Slow Query ---
+        logger.info("=== Slow Query ===")
+        count = self._execute_slow_query(sleep_duration=3.0, query_type="sleep")
+        ajax_request_count += count
 
-        if nav_step_errors.success:
-            selector, description = self.ERROR_AJAX_BUTTON
-            logger.info(f"Clicking AJAX error trigger: {description}")
-            # AJAXリクエスト後に3秒以上待機（Requirements 4.2）
-            click_step = self.click_element(selector, wait_after=3.0)
-            click_step.page_name = description
-            click_step.metadata = {"ajax_type": "error_500", "page": "/performance/js-errors"}
-            self.results.append(click_step)
+        count = self._execute_slow_query(sleep_duration=2.0, query_type="complex_join")
+        ajax_request_count += count
 
-            # triggerNetworkError()はJS例外をthrowするためclick_stepが
-            # success=Falseになる場合があるが、ボタンクリック自体は成功と見なす
-            # （AjaxRequestイベントはthrow前に発生済み）
-            if click_step.success or click_step.duration_ms > 1000:
-                ajax_request_count += 1
-        else:
-            logger.warning("Failed to navigate to JS errors page, skipping error AJAX trigger")
+        # --- 3. Database Errors (全4タイプ) ---
+        logger.info("=== Database Errors ===")
+        for error_type in ["syntax", "constraint", "connection", "timeout"]:
+            count = self._execute_database_error(error_type)
+            ajax_request_count += count
 
-        # ステータス判定: 少なくとも1つのAJAXリクエストがトリガーされれば成功
-        if ajax_request_count > 0:
-            status = TestStatus.COMPLETED
-        else:
-            status = TestStatus.FAILED
+        # --- 4. JSエラーページでのNetwork Error ---
+        logger.info("=== Network Error (JS) ===")
+        count = self._execute_network_error()
+        ajax_request_count += count
+
+        # ステータス判定
+        status = TestStatus.COMPLETED if ajax_request_count > 0 else TestStatus.FAILED
 
         return ScenarioResult(
             name=self.name,
@@ -119,13 +103,156 @@ class AjaxScenario(BaseScenario):
             steps=self.results,
             expected_events={"AjaxRequest": ajax_request_count},
             error_message=None if ajax_request_count > 0
-            else "No AJAX requests were triggered successfully",
+            else "No AJAX requests were triggered",
         )
 
-    def _login(self):
-        """テスト用アカウントでログインする（認証が必要なページ用）"""
+    def _login(self) -> bool:
+        """テスト用アカウントでログイン"""
         logger.info("Logging in for AJAX scenario...")
-        self.navigate_to("/auth/login")
-        self.fill_form("input[name='email']", "admin@example.com")
-        self.fill_form("input[name='password']", "admin123")
-        self.click_element("button[type='submit']", wait_after=2.0)
+        nav = self.navigate_to("/auth/login")
+        self.results.append(nav)
+        if not nav.success:
+            return False
+
+        fill1 = self.fill_form("input[name='email']", "admin@example.com")
+        self.results.append(fill1)
+        fill2 = self.fill_form("input[name='password']", "admin123")
+        self.results.append(fill2)
+        click = self.click_element("button[type='submit']", wait_after=2.0)
+        self.results.append(click)
+
+        return fill1.success and fill2.success and click.success
+
+    def _execute_n_plus_one(self, limit: int = 50) -> int:
+        """N+1クエリ問題を実行（パラメータ設定付き）"""
+        try:
+            # limitフィールドに値をセット
+            self._set_input_value("#nPlusOneLimit", str(limit))
+
+            # N+1クエリ実行ボタンをクリック
+            click_step = self.click_element(
+                "button[onclick*='callNPlusOne']", wait_after=5.0
+            )
+            click_step.page_name = f"N+1クエリ (limit={limit})"
+            click_step.metadata = {
+                "operation": "n_plus_one",
+                "limit": limit,
+                "backend_service": "Flask-EC-Distributed-Service",
+                "expected_queries": f"~{limit + 1} queries",
+            }
+            self.results.append(click_step)
+
+            if click_step.success:
+                logger.info(f"N+1 query executed with limit={limit}")
+                return 1
+            return 0
+        except Exception as e:
+            logger.error(f"Error executing N+1 query: {e}")
+            return 0
+
+    def _execute_slow_query(self, sleep_duration: float = 3.0,
+                            query_type: str = "sleep") -> int:
+        """Slow Queryを実行（パラメータ設定付き）"""
+        try:
+            # sleepDurationフィールドに値をセット
+            self._set_input_value("#sleepDuration", str(sleep_duration))
+
+            # queryTypeセレクトボックスを変更
+            self._set_select_value("#queryType", query_type)
+
+            # 待機時間はsleep_duration + 余裕3秒
+            wait_time = max(sleep_duration + 3.0, 5.0)
+
+            # スロークエリ実行ボタンをクリック
+            click_step = self.click_element(
+                "button[onclick*='callSlowQuery']", wait_after=wait_time
+            )
+            click_step.page_name = f"SlowQuery ({query_type}, {sleep_duration}s)"
+            click_step.metadata = {
+                "operation": "slow_query",
+                "query_type": query_type,
+                "sleep_duration": sleep_duration,
+                "backend_service": "Flask-EC-Distributed-Service",
+            }
+            self.results.append(click_step)
+
+            if click_step.success:
+                logger.info(
+                    f"Slow query executed: type={query_type}, duration={sleep_duration}s"
+                )
+                return 1
+            return 0
+        except Exception as e:
+            logger.error(f"Error executing slow query: {e}")
+            return 0
+
+    def _execute_database_error(self, error_type: str) -> int:
+        """データベースエラーを実行"""
+        try:
+            # errorTypeセレクトボックスを変更
+            self._set_select_value("#errorType", error_type)
+
+            # データベースエラー実行ボタンをクリック
+            click_step = self.click_element(
+                "button[onclick*='callDatabaseError']", wait_after=5.0
+            )
+            click_step.page_name = f"DBエラー ({error_type})"
+            click_step.metadata = {
+                "operation": "database_error",
+                "error_type": error_type,
+                "backend_service": "Flask-EC-Distributed-Service",
+                "expected_result": "500 error from distributed service",
+            }
+            self.results.append(click_step)
+
+            if click_step.success:
+                logger.info(f"Database error executed: type={error_type}")
+                return 1
+            return 0
+        except Exception as e:
+            logger.error(f"Error executing database error ({error_type}): {e}")
+            return 0
+
+    def _execute_network_error(self) -> int:
+        """JSエラーページでNetwork Errorをトリガー"""
+        nav_step = self.navigate_to("/performance/js-errors")
+        self.results.append(nav_step)
+
+        if not nav_step.success:
+            return 0
+
+        click_step = self.click_element(
+            "button[onclick*='triggerNetworkError']", wait_after=3.0
+        )
+        click_step.page_name = "Network Error (fetch API failure)"
+        click_step.metadata = {
+            "operation": "network_error",
+            "expected_result": "fetch API 500 error",
+        }
+        self.results.append(click_step)
+
+        # triggerNetworkErrorはJS例外をthrowするが、
+        # fetch自体は発行されるのでAjaxRequestは記録される
+        if click_step.success or click_step.duration_ms > 1000:
+            return 1
+        return 0
+
+    def _set_input_value(self, selector: str, value: str):
+        """input要素の値をJavaScript経由で設定"""
+        try:
+            self.driver.execute_script(
+                f"var el = document.querySelector('{selector}');"
+                f"if (el) {{ el.value = '{value}'; }}"
+            )
+        except WebDriverException as e:
+            logger.warning(f"Failed to set input value for {selector}: {e}")
+
+    def _set_select_value(self, selector: str, value: str):
+        """select要素の値をJavaScript経由で設定"""
+        try:
+            self.driver.execute_script(
+                f"var el = document.querySelector('{selector}');"
+                f"if (el) {{ el.value = '{value}'; }}"
+            )
+        except WebDriverException as e:
+            logger.warning(f"Failed to set select value for {selector}: {e}")

@@ -106,12 +106,71 @@ class JsErrorsScenario(BaseScenario):
         else:
             status = TestStatus.FAILED
 
+        # --- Rage Click: 同じボタンを高速連打してSession Replayで検出させる ---
+        self._execute_rage_click()
+
         return ScenarioResult(
             name=self.name,
             status=status,
             steps=self.results,
             expected_events={"JavaScriptError": len(self.ERROR_BUTTONS)},
         )
+
+    def _execute_rage_click(self):
+        """Rage Click を再現する（同じボタンを1秒以内に10回連打）
+
+        既に /performance/js-errors ページにいる状態で、
+        Null Referenceボタンを約100ms間隔で10回クリックする。
+        New Relic Session ReplayがRage Clickとして検出する。
+        """
+        import time
+
+        logger.info("=== Rage Click simulation (on JS errors page) ===")
+
+        selector = "button[onclick*='triggerNullError']"
+        try:
+            from selenium.webdriver.common.by import By
+            from selenium.webdriver.support.ui import WebDriverWait
+            from selenium.webdriver.support import expected_conditions as EC
+
+            button = WebDriverWait(self.driver, 5).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
+            )
+        except Exception:
+            logger.warning("Rage click target button not found")
+            return
+
+        # 10回連打（約100ms間隔 = 1秒以内に10クリック）
+        start_time = time.time()
+        click_count = 0
+        for i in range(10):
+            try:
+                button.click()
+                click_count += 1
+                time.sleep(0.1)
+            except WebDriverException:
+                pass
+
+        duration_ms = (time.time() - start_time) * 1000
+
+        rage_step = StepResult(
+            action="rage_click",
+            target=selector,
+            success=click_count >= 4,
+            duration_ms=duration_ms,
+            metadata={
+                "click_count": click_count,
+                "interval_ms": 100,
+                "target_button": "triggerNullError",
+                "purpose": "Session Replay Rage Click detection",
+            },
+        )
+        self.results.append(rage_step)
+
+        # Browser Agentがデータ送信する時間を確保
+        time.sleep(3.0)
+
+        logger.info(f"Rage click completed: {click_count} clicks in {duration_ms:.0f}ms")
 
     def _get_browser_console_errors(self) -> int:
         """ブラウザコンソールログからSEVEREレベルエントリ数を取得する。
