@@ -170,3 +170,51 @@ def get_results(run_id):
             "error": "結果取得に失敗しました",
             "details": str(e),
         }), 500
+
+
+@bp.route('/api/loop', methods=['POST'])
+def start_loop():
+    """ループ実行をBrowser Test Runnerに委譲"""
+    try:
+        payload = request.get_json(silent=True) or {}
+        response = requests.post(
+            f"{BROWSER_TESTER_URL}/api/tests/loop",
+            json=payload,
+            timeout=10,
+        )
+        return jsonify(response.json()), response.status_code
+    except requests.ConnectionError:
+        return jsonify({"error": "Browser Test Runnerに接続できません"}), 503
+    except Exception as e:
+        logger.error(f"Error starting loop: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route('/api/loop/status')
+def get_loop_status():
+    """ループ実行ステータスをプロキシ取得"""
+    try:
+        response = requests.get(
+            f"{BROWSER_TESTER_URL}/api/tests/loop/status",
+            timeout=5,
+        )
+        return jsonify(response.json()), response.status_code
+    except requests.ConnectionError:
+        return jsonify({"status": "disconnected"}), 503
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route('/api/loop/stop', methods=['POST'])
+def stop_loop():
+    """ループ実行停止をプロキシ"""
+    try:
+        response = requests.post(
+            f"{BROWSER_TESTER_URL}/api/tests/loop/stop",
+            timeout=5,
+        )
+        return jsonify(response.json()), response.status_code
+    except requests.ConnectionError:
+        return jsonify({"error": "Browser Test Runnerに接続できません"}), 503
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

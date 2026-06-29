@@ -52,6 +52,10 @@ result_store = ResultStore(results_dir=_results_dir)
 _run_lock = threading.Lock()
 _current_run: Optional[Dict[str, Any]] = None
 
+# ループ実行状態
+_loop_state: Optional[Dict[str, Any]] = None
+_loop_cancel_event = threading.Event()
+
 
 def create_app() -> Flask:
     """Flaskアプリケーションを生成する"""
@@ -198,6 +202,97 @@ def create_app() -> Flask:
         history = result_store.get_history(limit=10)
         return jsonify({"history": history, "count": len(history)})
 
+    @app.route("/api/tests/loop", methods=["POST"])
+    def start_loop():
+        """ループ実行開始エンドポイント
+
+        指定回数または指定時間の間、テストを繰り返し実行する。
+        Request Body:
+        {
+            "mode": "count" | "duration",
+            "count": 10,              // mode=count時: 繰り返し回数
+            "duration_minutes": 30,   // mode=duration時: 実行時間（分）
+            "interval_seconds": 10,   // 各実行間の待機時間（秒、デフォルト10）
+            "scenarios": [...]        // オプション: 実行シナリオ
+        }
+        """
+        global _loop_state
+
+        with _run_lock:
+            if _loop_state is not None and _loop_state.get("status") == "running":
+                return jsonify({
+                    "error": "A loop is already running",
+                    "loop_id": _loop_state["loop_id"],
+                }), 409
+
+        body = request.get_json(silent=True) or {}
+        mode = body.get("mode", "count")
+        count = body.get("count", 10)
+        duration_minutes = body.get("duration_minutes", 30)
+        interval_seconds = body.get("interval_seconds", 10)
+        scenarios = body.get("scenarios", AVAILABLE_SCENARIOS)
+
+        # バリデーション
+        if mode not in ("count", "duration"):
+            return jsonify({"error": "mode must be 'count' or 'duration'"}), 400
+        if mode == "count" and (not isinstance(count, int) or count < 1):
+            return jsonify({"error": "count must be a positive integer"}), 400
+        if mode == "duration" and (duration_minutes < 1):
+            return jsonify({"error": "duration_minutes must be >= 1"}), 400
+
+        loop_id = str(uuid.uuid4())
+        _loop_cancel_event.clear()
+
+        _loop_state = {
+            "loop_id": loop_id,
+            "status": "running",
+            "mode": mode,
+            "target_count": count if mode == "count" else None,
+            "target_duration_minutes": duration_minutes if mode == "duration" else None,
+            "interval_seconds": interval_seconds,
+            "completed_iterations": 0,
+            "successful_iterations": 0,
+            "failed_iterations": 0,
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": None,
+            "scenarios": scenarios,
+        }
+
+        thread = threading.Thread(
+            target=_execute_loop,
+            args=(loop_id, mode, count, duration_minutes, interval_seconds, scenarios),
+            daemon=True,
+        )
+        thread.start()
+
+        logger.info(f"Loop started: id={loop_id}, mode={mode}, count={count}, duration={duration_minutes}min")
+
+        return jsonify({
+            "loop_id": loop_id,
+            "status": "running",
+            "mode": mode,
+            "target": count if mode == "count" else f"{duration_minutes}min",
+        }), 202
+
+    @app.route("/api/tests/loop/status", methods=["GET"])
+    def get_loop_status():
+        """ループ実行ステータス取得"""
+        global _loop_state
+        if _loop_state is None:
+            return jsonify({"status": "idle", "message": "No loop running"})
+        return jsonify(_loop_state)
+
+    @app.route("/api/tests/loop/stop", methods=["POST"])
+    def stop_loop():
+        """ループ実行停止"""
+        global _loop_state
+        if _loop_state is None or _loop_state.get("status") != "running":
+            return jsonify({"error": "No loop is currently running"}), 404
+
+        _loop_cancel_event.set()
+        logger.info(f"Loop stop requested: {_loop_state['loop_id']}")
+        return jsonify({"status": "stopping", "loop_id": _loop_state["loop_id"]})
+
     return app
 
 
@@ -308,6 +403,77 @@ def _execute_run(run_id: str, scenarios: list, config_override: dict) -> None:
                     "current_scenario": None,
                 },
             }
+
+
+def _execute_loop(loop_id: str, mode: str, count: int, duration_minutes: int,
+                  interval_seconds: int, scenarios: list) -> None:
+    """ループ実行のメインロジック
+
+    Args:
+        loop_id: ループ実行ID
+        mode: "count" or "duration"
+        count: 繰り返し回数（mode=count時）
+        duration_minutes: 実行時間（分、mode=duration時）
+        interval_seconds: 各実行間の待機時間
+        scenarios: 実行するシナリオリスト
+    """
+    global _loop_state
+
+    start_time = time.time()
+    end_time = start_time + (duration_minutes * 60) if mode == "duration" else None
+    iteration = 0
+
+    try:
+        while True:
+            # キャンセルチェック
+            if _loop_cancel_event.is_set():
+                logger.info(f"Loop {loop_id} cancelled by user")
+                break
+
+            # 終了条件チェック
+            if mode == "count" and iteration >= count:
+                break
+            if mode == "duration" and time.time() >= end_time:
+                break
+
+            iteration += 1
+            logger.info(f"Loop {loop_id}: iteration {iteration} starting...")
+
+            # テスト実行
+            config = load_config_from_env()
+            engine = ScenarioEngine(config)
+            run_result = engine.run_scenarios(scenarios)
+
+            # 結果保存
+            result_store.save(run_result)
+
+            # ステータス更新
+            if run_result.status == TestStatus.COMPLETED:
+                _loop_state["successful_iterations"] += 1
+            else:
+                _loop_state["failed_iterations"] += 1
+            _loop_state["completed_iterations"] = iteration
+
+            logger.info(
+                f"Loop {loop_id}: iteration {iteration} done "
+                f"(status={run_result.status.value})"
+            )
+
+            # 次の実行まで待機（キャンセル可能）
+            if _loop_cancel_event.wait(timeout=interval_seconds):
+                logger.info(f"Loop {loop_id} cancelled during interval wait")
+                break
+
+    except Exception as e:
+        logger.error(f"Loop {loop_id} error: {e}")
+    finally:
+        _loop_state["status"] = "completed"
+        _loop_state["completed_at"] = datetime.now(timezone.utc).isoformat()
+        logger.info(
+            f"Loop {loop_id} finished: {_loop_state['completed_iterations']} iterations "
+            f"({_loop_state['successful_iterations']} success, "
+            f"{_loop_state['failed_iterations']} failed)"
+        )
 
 
 # Flaskアプリのインスタンス生成（FLASK_APP=api で使用）

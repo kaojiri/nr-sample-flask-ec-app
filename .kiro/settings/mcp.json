@@ -1,4 +1,24 @@
 {
   "mcpServers": {
+    "new-relic-mcp": {
+      "url": "https://mcp.newrelic.com/mcp/",
+      "disabled": false,
+      "autoApprove": [
+        "list_available_new_relic_accounts",
+        "get_entity",
+        "execute_nrql_query"
+      ]
+    },
+    "newrelic-docs-remote": {
+     "url": "https://doc.learn.nrkk.technology/mcp",
+     "headers": {
+       "Authorization": "e6c2c22c2d0df00a5d523ff09d15f42c8bc792951ac4782581eb83087d52cda0"
+     },
+     "disabled": false,
+     "autoApprove": [
+       "search_newrelic_docs",
+       "search_attribute_dictionary"
+     ]
+   }
   }
 }

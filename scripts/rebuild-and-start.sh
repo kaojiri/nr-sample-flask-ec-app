@@ -20,9 +20,9 @@ echo -e "${GREEN}=== Flask EC App 再ビルド＆起動 ===${NC}"
 echo -e "${YELLOW}既存のコンテナを停止中...${NC}"
 docker-compose down
 
-# イメージを再ビルド（キャッシュなし）
+# イメージを再ビルド
 echo -e "${YELLOW}Docker イメージを再ビルド中...${NC}"
-docker-compose build --no-cache
+docker-compose build
 
 # 起動
 echo -e "${YELLOW}コンテナを起動中...${NC}"

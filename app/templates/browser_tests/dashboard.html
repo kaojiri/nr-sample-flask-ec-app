@@ -145,6 +145,60 @@
                 </div>
             </div>
 
+            <!-- ループ実行コントロール -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-redo"></i> 繰り返し実行</h5>
+                    <div id="loop-status-badge"></div>
+                </div>
+                <div class="card-body">
+                    <div class="row align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label">実行モード</label>
+                            <select class="form-select" id="loop-mode" onchange="toggleLoopFields()">
+                                <option value="count">回数指定</option>
+                                <option value="duration">時間指定</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3" id="loop-count-field">
+                            <label class="form-label">繰り返し回数</label>
+                            <input type="number" class="form-control" id="loop-count" value="10" min="1" max="1000">
+                        </div>
+                        <div class="col-md-3" id="loop-duration-field" style="display:none;">
+                            <label class="form-label">実行時間（分）</label>
+                            <input type="number" class="form-control" id="loop-duration" value="30" min="1" max="480">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">実行間隔（秒）</label>
+                            <input type="number" class="form-control" id="loop-interval" value="10" min="5" max="300">
+                        </div>
+                        <div class="col-md-3 mt-2">
+                            <button class="btn btn-success w-100" id="btn-loop-start" onclick="startLoop()" {% if not runner_status.connected %}disabled{% endif %}>
+                                <i class="fas fa-play"></i> ループ開始
+                            </button>
+                            <button class="btn btn-danger w-100 mt-1" id="btn-loop-stop" onclick="stopLoop()" style="display:none;">
+                                <i class="fas fa-stop"></i> ループ停止
+                            </button>
+                        </div>
+                    </div>
+                    <!-- ループ進捗 -->
+                    <div id="loop-progress" class="mt-3" style="display:none;">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span id="loop-progress-text">実行中...</span>
+                            <span id="loop-progress-count"></span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-success" id="loop-progress-bar-success" role="progressbar" style="width: 0%"></div>
+                            <div class="progress-bar bg-danger" id="loop-progress-bar-failed" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <small class="text-muted mt-1 d-block">
+                            <span class="text-success" id="loop-success-count">0</span> 成功 /
+                            <span class="text-danger" id="loop-failed-count">0</span> 失敗
+                        </small>
+                    </div>
+                </div>
+            </div>
+
             <!-- 実行ステータス・結果表示エリア -->
             <div class="card mb-4" id="execution-panel" style="display: none;">
                 <div class="card-header">
@@ -715,5 +769,131 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+// --- ループ実行 ---
+
+let loopPollingInterval = null;
+
+function toggleLoopFields() {
+    const mode = document.getElementById('loop-mode').value;
+    document.getElementById('loop-count-field').style.display = mode === 'count' ? '' : 'none';
+    document.getElementById('loop-duration-field').style.display = mode === 'duration' ? '' : 'none';
+}
+
+function startLoop() {
+    const mode = document.getElementById('loop-mode').value;
+    const count = parseInt(document.getElementById('loop-count').value);
+    const duration = parseInt(document.getElementById('loop-duration').value);
+    const interval = parseInt(document.getElementById('loop-interval').value);
+
+    const payload = {
+        mode: mode,
+        count: count,
+        duration_minutes: duration,
+        interval_seconds: interval,
+    };
+
+    fetch(`${API_BASE}/loop`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(response => {
+        if (!response.ok) return response.json().then(d => { throw new Error(d.error || 'Failed'); });
+        return response.json();
+    })
+    .then(data => {
+        document.getElementById('btn-loop-start').style.display = 'none';
+        document.getElementById('btn-loop-stop').style.display = '';
+        document.getElementById('loop-progress').style.display = '';
+        document.getElementById('loop-status-badge').innerHTML = '<span class="badge bg-success">実行中</span>';
+        startLoopPolling();
+    })
+    .catch(error => {
+        alert('ループ開始失敗: ' + error.message);
+    });
+}
+
+function stopLoop() {
+    fetch(`${API_BASE}/loop/stop`, { method: 'POST' })
+    .then(response => response.json())
+    .then(() => {
+        document.getElementById('loop-status-badge').innerHTML = '<span class="badge bg-warning text-dark">停止中...</span>';
+    })
+    .catch(error => {
+        alert('停止失敗: ' + error.message);
+    });
+}
+
+function startLoopPolling() {
+    if (loopPollingInterval) clearInterval(loopPollingInterval);
+    loopPollingInterval = setInterval(pollLoopStatus, 3000);
+    pollLoopStatus();
+}
+
+function pollLoopStatus() {
+    fetch(`${API_BASE}/loop/status`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'idle') {
+            stopLoopPolling();
+            return;
+        }
+
+        const completed = data.completed_iterations || 0;
+        const success = data.successful_iterations || 0;
+        const failed = data.failed_iterations || 0;
+        const target = data.target_count || '∞';
+
+        document.getElementById('loop-progress-text').textContent =
+            data.status === 'running' ? `実行中 (${data.mode === 'count' ? completed + '/' + target : completed + '回完了'})` : '完了';
+        document.getElementById('loop-progress-count').textContent = `${completed} 回`;
+        document.getElementById('loop-success-count').textContent = success;
+        document.getElementById('loop-failed-count').textContent = failed;
+
+        // プログレスバー
+        if (data.mode === 'count' && data.target_count) {
+            const successPct = (success / data.target_count) * 100;
+            const failedPct = (failed / data.target_count) * 100;
+            document.getElementById('loop-progress-bar-success').style.width = successPct + '%';
+            document.getElementById('loop-progress-bar-failed').style.width = failedPct + '%';
+        } else {
+            const total = success + failed;
+            if (total > 0) {
+                document.getElementById('loop-progress-bar-success').style.width = (success / total * 100) + '%';
+                document.getElementById('loop-progress-bar-failed').style.width = (failed / total * 100) + '%';
+            }
+        }
+
+        if (data.status === 'completed') {
+            stopLoopPolling();
+            document.getElementById('btn-loop-start').style.display = '';
+            document.getElementById('btn-loop-stop').style.display = 'none';
+            document.getElementById('loop-status-badge').innerHTML = '<span class="badge bg-secondary">完了</span>';
+        }
+    })
+    .catch(() => {});
+}
+
+function stopLoopPolling() {
+    if (loopPollingInterval) {
+        clearInterval(loopPollingInterval);
+        loopPollingInterval = null;
+    }
+}
+
+// ページ読み込み時にループ状態を確認
+fetch(`${API_BASE}/loop/status`)
+.then(r => r.json())
+.then(data => {
+    if (data.status === 'running') {
+        document.getElementById('btn-loop-start').style.display = 'none';
+        document.getElementById('btn-loop-stop').style.display = '';
+        document.getElementById('loop-progress').style.display = '';
+        document.getElementById('loop-status-badge').innerHTML = '<span class="badge bg-success">実行中</span>';
+        startLoopPolling();
+    }
+})
+.catch(() => {});
 </script>
 {% endblock %}
