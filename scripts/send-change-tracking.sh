@@ -107,7 +107,7 @@ if [ "$DEBUG_MODE" = "1" ]; then
     echo "$GRAPHQL_MUTATION" | jq '.'
 fi
 
-RESPONSE=$(curl -s -X POST https://api.newrelic.com/graphql \
+RESPONSE=$(curl -s -X POST https://api.jp.newrelic.com/graphql \
   -H "Content-Type: application/json" \
   -H "API-Key: ${NEW_RELIC_API_KEY}" \
   -d "${GRAPHQL_MUTATION}" \
@@ -132,7 +132,7 @@ if echo "$RESPONSE" | grep -q '"changeTrackingEvent"'; then
     echo -e "${GREEN}✅ Change tracking event created successfully${NC}"
     
     # Get app name for better user guidance
-    APP_NAME=$(curl -s -X POST https://api.newrelic.com/graphql \
+    APP_NAME=$(curl -s -X POST https://api.jp.newrelic.com/graphql \
       -H "Content-Type: application/json" \
       -H "API-Key: ${NEW_RELIC_API_KEY}" \
       -d "{\"query\": \"{ actor { entity(guid: \\\"${NEW_RELIC_ENTITY_GUID}\\\") { name } } }\"}" | \

@@ -7,6 +7,11 @@ license_key: ${NRIA_LICENSE_KEY}
 # Display name for this agent instance
 display_name: ${NRIA_DISPLAY_NAME}
 
+# Japan DC endpoints (explicit override)
+collector_url: https://infra-api.jp.nr-data.net
+identity_url: https://identity-api.jp.nr-data.net
+command_channel_url: https://infrastructure-command-api.jp.nr-data.net
+
 # Log level for the agent (debug, info, warn, error)
 log_level: debug
 
