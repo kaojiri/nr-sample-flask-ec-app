@@ -3,7 +3,7 @@ from app.models import Product
 
 bp = Blueprint('products', __name__, url_prefix='/products')
 
-@bp.route('/')
+@bp.route('/', strict_slashes=False)
 def list_products():
     page = request.args.get('page', 1, type=int)
     category = request.args.get('category')
