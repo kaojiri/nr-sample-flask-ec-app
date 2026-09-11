@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+
+{% block title %}Rage Click Demo - EC Shop{% endblock %}
+
+{% block content %}
+<div class="alert alert-danger" role="alert">
+    <h4 class="alert-heading">🚨 Rage Click 再現デモ（ワークフロー承認画面）</h4>
+    <p>このページは<strong>「止血したはずが、また同じ電話が鳴る」</strong>のモデルケースを再現します。</p>
+    <hr>
+    <p class="mb-0">
+        添付ファイルを開くボタンは<strong>JSエラーで無反応</strong>になります。画面上は何も起きないように見えるため、
+        ユーザーはボタンを連打（Rage Click）します。連打はサーバーの重い処理を呼び出し、
+        <strong>アプリケーションサーバーの負荷上昇</strong>につながります。
+    </p>
+</div>
+
+<h1>ワークフロー承認画面</h1>
+<p class="lead">課長「承認したいんだけど、添付ファイルが開かないんだよ…」</p>
+
+<div class="row mt-4">
+    <div class="col-md-7 mb-4">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0"><i class="fas fa-file-signature"></i> 稟議書：2026年度 設備投資申請</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-3">
+                    <dt class="col-sm-3">申請者</dt>
+                    <dd class="col-sm-9">営業部 山田</dd>
+                    <dt class="col-sm-3">承認者</dt>
+                    <dd class="col-sm-9">営業部長 佐藤（課長代理）</dd>
+                    <dt class="col-sm-3">金額</dt>
+                    <dd class="col-sm-9">¥1,250,000</dd>
+                    <dt class="col-sm-3">添付</dt>
+                    <dd class="col-sm-9">
+                        <i class="fas fa-paperclip"></i> 見積書_2026設備投資.pdf
+                    </dd>
+                </dl>
+
+                <div class="d-flex align-items-center gap-3">
+                    <!-- このボタンはJSエラーで無反応になる（画面上は何も変わらない） -->
+                    <button id="openAttachmentBtn" class="btn btn-primary btn-lg">
+                        <i class="fas fa-file-pdf"></i> 添付ファイルを開く
+                    </button>
+                    <span id="clickStatus" class="text-muted">クリックしても画面は変わりません…</span>
+                </div>
+
+                <hr>
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success" disabled>
+                        <i class="fas fa-check"></i> 承認する
+                    </button>
+                    <button class="btn btn-outline-secondary" disabled>
+                        <i class="fas fa-times"></i> 差し戻す
+                    </button>
+                    <small class="text-muted align-self-center">※添付を確認するまで承認できません</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-5 mb-4">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-chart-line"></i> Rage Click カウンター</h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-1">連打回数</p>
+                <h2 id="clickCount" class="display-4 text-danger">0</h2>
+                <p class="mb-1">直近1秒間のクリック</p>
+                <h4 id="recentClicks" class="text-warning">0</h4>
+                <div id="rageAlert" class="alert alert-warning d-none mt-3 mb-0">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Rage Click 検出！</strong> ユーザーがイライラして連打しています。
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-danger mt-3">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="fas fa-server"></i> サーバー負荷連携</h5>
+            </div>
+            <div class="card-body">
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" id="serverLoadToggle" checked>
+                    <label class="form-check-label" for="serverLoadToggle">
+                        連打ごとにサーバーの重い処理を呼び出す
+                    </label>
+                </div>
+                <p class="mb-1">サーバーリクエスト送信数</p>
+                <h4 id="serverRequests" class="text-danger">0</h4>
+                <small class="text-muted">
+                    連打が <code>/performance/high-cpu</code> を叩き、アプリサーバー負荷を押し上げます。
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-secondary mt-2">
+    <h5>📖 このデモで再現している因果</h5>
+    <ol class="mb-0">
+        <li><strong>JSエラーで画面無反応</strong>：添付ボタンをクリックすると内部でJSエラーが発生。UIは何も変わらない</li>
+        <li><strong>ボタン連打（Rage Click）</strong>：無反応に見えるためユーザーが連打</li>
+        <li><strong>サーバー負荷増</strong>：連打が重いサーバー処理を呼び、アプリサーバーの負荷が上昇</li>
+        <li><strong>他処理まで遅延</strong>：負荷上昇で他ユーザーの操作パフォーマンスも劣化</li>
+    </ol>
+</div>
+
+<div class="alert alert-success">
+    <h5>✅ New Relic での確認方法</h5>
+    <ol class="mb-0">
+        <li><strong>Browser → Session Replay</strong>：Rage Click（連打）を検出</li>
+        <li><strong>Browser → JS Errors / Errors Inbox</strong>：無反応の原因となったJSエラーを確認</li>
+        <li><strong>APM → Transactions</strong>：<code>/performance/high-cpu</code> の負荷上昇を確認</li>
+        <li><strong>切り分け</strong>：「サーバー負荷」という症状と「フロントのJSエラー」という根本原因を分離できる</li>
+    </ol>
+</div>
+
+<div class="mt-4">
+    <a href="{{ url_for('performance.index') }}" class="btn btn-outline-primary me-2">← パフォーマンスデモに戻る</a>
+    <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">← Topページに戻る</a>
+</div>
+
+<script>
+(function () {
+    var clickCount = 0;
+    var serverRequests = 0;
+    var recentClickTimestamps = [];
+
+    var btn = document.getElementById('openAttachmentBtn');
+    var clickCountEl = document.getElementById('clickCount');
+    var recentClicksEl = document.getElementById('recentClicks');
+    var serverRequestsEl = document.getElementById('serverRequests');
+    var rageAlertEl = document.getElementById('rageAlert');
+    var clickStatusEl = document.getElementById('clickStatus');
+    var serverLoadToggle = document.getElementById('serverLoadToggle');
+
+    // 直近1秒間のクリック数を更新
+    function updateRecentClicks() {
+        var now = Date.now();
+        recentClickTimestamps = recentClickTimestamps.filter(function (t) {
+            return now - t < 1000;
+        });
+        recentClicksEl.textContent = recentClickTimestamps.length;
+
+        // Rage Click 判定：1秒間に3回以上
+        if (recentClickTimestamps.length >= 3) {
+            rageAlertEl.classList.remove('d-none');
+
+            // New Relic にカスタムイベント/属性として記録
+            if (window.newrelic) {
+                if (window.newrelic.addPageAction) {
+                    window.newrelic.addPageAction('RageClick', {
+                        element: 'openAttachmentBtn',
+                        clicksInWindow: recentClickTimestamps.length,
+                        totalClicks: clickCount,
+                        page: 'approval_workflow'
+                    });
+                }
+                if (window.newrelic.setCustomAttribute) {
+                    window.newrelic.setCustomAttribute('rageClickDetected', true);
+                }
+            }
+        } else {
+            rageAlertEl.classList.add('d-none');
+        }
+    }
+
+    // 連打のたびにサーバーの重い処理を呼び出す（アプリサーバー負荷を再現）
+    function hitServer() {
+        if (!serverLoadToggle.checked) {
+            return;
+        }
+        serverRequests++;
+        serverRequestsEl.textContent = serverRequests;
+
+        fetch('{{ url_for("performance.high_cpu") }}')
+            .then(function (res) {
+                if (window.logToNewRelic) {
+                    window.logToNewRelic('warn', 'Rage click triggered heavy server request', {
+                        event_type: 'rage_click_server_load',
+                        status: res.status,
+                        totalServerRequests: serverRequests
+                    });
+                }
+            })
+            .catch(function (err) {
+                console.error('Server load request failed:', err);
+                if (window.newrelic) {
+                    window.newrelic.noticeError(err, { context: 'rage_click_server_load' });
+                }
+            });
+    }
+
+    // 添付ボタンのクリックハンドラ：JSエラーで無反応になる
+    btn.addEventListener('click', function () {
+        clickCount++;
+        clickCountEl.textContent = clickCount;
+        recentClickTimestamps.push(Date.now());
+        updateRecentClicks();
+
+        // 連打でサーバー負荷を発生させる
+        hitServer();
+
+        // 添付ファイルを開こうとするが、内部でJSエラーが発生して失敗する
+        // → 画面上は何も変わらない（無反応に見える）
+        try {
+            openAttachment();
+        } catch (e) {
+            // エラーを New Relic に報告するが、UIには一切反映しない（無反応を再現）
+            if (window.newrelic) {
+                window.newrelic.noticeError(e, {
+                    errorType: 'AttachmentOpenError',
+                    element: 'openAttachmentBtn',
+                    clickNumber: clickCount,
+                    page: 'approval_workflow'
+                });
+            }
+            console.error('Attachment open failed (UI shows nothing):', e);
+        }
+    });
+
+    // 添付ファイルを開く処理（意図的にJSエラーを発生させる）
+    function openAttachment() {
+        // 存在しないビューアオブジェクトのメソッドを呼び出す
+        // → TypeError: Cannot read properties of undefined
+        var viewer = window.__pdfViewer; // undefined
+        viewer.open('見積書_2026設備投資.pdf'); // ここでエラー
+    }
+
+    // 1秒ごとに直近クリック表示を減衰させる
+    setInterval(updateRecentClicks, 500);
+})();
+</script>
+{% endblock %}

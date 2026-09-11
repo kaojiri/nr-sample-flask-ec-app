@@ -161,6 +161,25 @@
     </div>
 
     <div class="col-md-6 mb-4">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5>😡 Rage Click（連打）シナリオ</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>問題:</strong> JSエラーでボタンが無反応 → ユーザーが連打 → サーバー負荷増</p>
+                <p><strong>New Relic で検知:</strong></p>
+                <ul>
+                    <li>Session Replay で Rage Click を検出</li>
+                    <li>JS Errors で無反応の根本原因を確認</li>
+                    <li>APM でアプリサーバー負荷の上昇を確認</li>
+                    <li>症状（負荷）と根本原因（JSエラー）を切り分け</li>
+                </ul>
+                <a href="{{ url_for('performance.rage_click_demo') }}" class="btn btn-danger">Rage Clickデモ</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
         <div class="card border-info">
             <div class="card-header bg-info text-white">
                 <h5>📊 テストデータ生成</h5>

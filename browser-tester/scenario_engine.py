@@ -44,6 +44,8 @@ def _load_scenarios():
         "scenarios.ajax",
         "scenarios.js_errors",
         "scenarios.web_vitals",
+        "scenarios.rage_click_incident",
+        "scenarios.normal_baseline",
     ]
     for module_name in scenario_modules:
         try:

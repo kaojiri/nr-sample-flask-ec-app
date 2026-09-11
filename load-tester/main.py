@@ -55,6 +55,10 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Include API routes
 app.include_router(api_router, prefix="/api")
 
+# Include independent baseline load routes (self-contained, no shared state)
+from baseline_api import router as baseline_router
+app.include_router(baseline_router, prefix="/api")
+
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
     """Main dashboard page"""

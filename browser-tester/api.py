@@ -31,7 +31,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # 利用可能なシナリオ名
-AVAILABLE_SCENARIOS = ["navigation", "interaction", "ajax", "js_errors", "web_vitals"]
+AVAILABLE_SCENARIOS = [
+    "navigation",
+    "interaction",
+    "ajax",
+    "js_errors",
+    "web_vitals",
+    "rage_click_incident",
+    "normal_baseline",
+]
 
 # アプリ起動時刻
 APP_START_TIME = time.time()

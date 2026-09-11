@@ -139,6 +139,28 @@
                                         </button>
                                     </td>
                                 </tr>
+                                <tr id="scenario-row-rage_click_incident">
+                                    <td><i class="fas fa-hand-rock text-danger"></i> <strong>rage_click_incident</strong></td>
+                                    <td>承認画面のJSエラーで無反応→Rage Click→サーバー負荷→他ページ遅延の一連を再現</td>
+                                    <td><span class="badge bg-danger">JavaScriptError</span> <span class="badge bg-secondary">PageAction</span> <span class="badge bg-info">PageView ×3</span></td>
+                                    <td><span class="scenario-last-result" data-scenario="rage_click_incident">-</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-danger btn-run-scenario" data-scenario="rage_click_incident" {% if not runner_status.connected %}disabled{% endif %}>
+                                            <i class="fas fa-play"></i> 実行
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr id="scenario-row-normal_baseline">
+                                    <td><i class="fas fa-heart-pulse text-success"></i> <strong>normal_baseline</strong></td>
+                                    <td>正常系ページ(トップ/商品一覧/商品詳細)のみを巡回する平常時ベースライン負荷。ループ実行でベースラインを作る用</td>
+                                    <td><span class="badge bg-info">PageView ×6</span></td>
+                                    <td><span class="scenario-last-result" data-scenario="normal_baseline">-</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-success btn-run-scenario" data-scenario="normal_baseline" {% if not runner_status.connected %}disabled{% endif %}>
+                                            <i class="fas fa-play"></i> 実行
+                                        </button>
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -153,6 +175,19 @@
                 </div>
                 <div class="card-body">
                     <div class="row align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label">対象シナリオ</label>
+                            <select class="form-select" id="loop-scenario">
+                                <option value="">全シナリオ</option>
+                                <option value="normal_baseline" selected>normal_baseline (ベースライン)</option>
+                                <option value="rage_click_incident">rage_click_incident (Rage Click)</option>
+                                <option value="navigation">navigation</option>
+                                <option value="interaction">interaction</option>
+                                <option value="ajax">ajax</option>
+                                <option value="js_errors">js_errors</option>
+                                <option value="web_vitals">web_vitals</option>
+                            </select>
+                        </div>
                         <div class="col-md-3">
                             <label class="form-label">実行モード</label>
                             <select class="form-select" id="loop-mode" onchange="toggleLoopFields()">
@@ -785,6 +820,7 @@ function startLoop() {
     const count = parseInt(document.getElementById('loop-count').value);
     const duration = parseInt(document.getElementById('loop-duration').value);
     const interval = parseInt(document.getElementById('loop-interval').value);
+    const scenario = document.getElementById('loop-scenario').value;
 
     const payload = {
         mode: mode,
@@ -792,6 +828,10 @@ function startLoop() {
         duration_minutes: duration,
         interval_seconds: interval,
     };
+    // 特定シナリオが選択されていればそれだけをループ。空(全シナリオ)なら scenarios を送らない
+    if (scenario) {
+        payload.scenarios = [scenario];
+    }
 
     fetch(`${API_BASE}/loop`, {
         method: 'POST',
